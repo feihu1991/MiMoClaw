@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MiMo Claw</string>
+    <string name="login_title">Xiaomi Account</string>
+    <string name="login_email_hint">Email/Phone/Xiaomi Account</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_agree_text">I\'ve read and agreed to the Xiaomi Account User Agreement and Xiaomi Account Privacy Policy</string>
+    <string name="login_forgot_password">Forgot password?</string>
+    <string name="login_phone_signin">Sign in using phone number</string>
+    <string name="login_more_options">More options</string>
+    <string name="login_alipay">Sign in with Alipay</string>
+    <string name="login_wechat">Sign in with WeChat</string>
+    <string name="login_qq">Sign in with QQ</string>
+    <string name="login_weibo">Sign in with Weibo</string>
+
+    <string name="nav_mimo_claw">MiMo Claw</string>
+    <string name="nav_mimo_chat">MiMo Chat</string>
+    <string name="nav_new_conversation">New conversation</string>
+    <string name="nav_api_service">API Service</string>
+    <string name="nav_subscribe">Subscribe</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="chat_input_hint">Type a message…</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_thinking">Thinking…</string>
+    <string name="chat_error">Something went wrong. Please try again.</string>
+
+    <string name="home_title">Your personal assistant</string>
+    <string name="home_subtitle">document generation, news aggregation, content creation, development efficiency, data analysis — unlocking endless possibilities.</string>
+    <string name="home_create_now">Create Now</string>
+    <string name="home_try_now">Try Now</string>
+
+    <string name="feature_flagship_model">Xiaomi MiMo Flagship Model</string>
+    <string name="feature_flagship_desc">MiMo-V2.5-Pro flagship model is deeply adapted to OpenClaw, with multimodal recognition and voice playback.</string>
+    <string name="feature_office">Kingsoft Office Ecosystem</string>
+    <string name="feature_office_desc">High-quality document generation, online preview, and online editing connect a one-stop Agent office loop.</string>
+    <string name="feature_tokenplan">TokenPlan Compute Guarantee</string>
+    <string name="feature_tokenplan_desc">Free on creation, with TokenPlan subscriptions at every tier for flexible shared compute quotas.</string>
+    <string name="feature_cloud">Ready to Use, Cloud Hosted</string>
+    <string name="feature_cloud_desc">Quickly get a 7×24h personal working Claw with cloud hosting, no deployment, and low-barrier AI Agent access.</string>
+
+    <string name="sidebar_hide">Hide sidebar</string>
+    <string name="sidebar_show">Show sidebar</string>
+    <string name="sidebar_upgrade">Upgrade</string>
+    <string name="sidebar_sign_in">Sign in</string>
+
+    <string name="subscribe_title">Subscribe</string>
+    <string name="subscribe_subtitle">Unlock more resource benefits</string>
+
+    <string name="chat_group_title">Chat group</string>
+    <string name="feedback_group_title">Subscription feedback group</string>
+
+    <string name="notice_title">Notice</string>
+    <string name="notice_desktop">For a better experience, please switch to a desktop browser</string>
+    <string name="notice_disclaimer">Developer demo platform for model showcases. Not a formal AI assistant. AI-generated content only.</string>
+</resources>
