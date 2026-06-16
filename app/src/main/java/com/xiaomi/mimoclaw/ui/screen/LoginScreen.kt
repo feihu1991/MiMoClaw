@@ -3,6 +3,7 @@ package com.xiaomi.mimoclaw.ui.screen
 import android.webkit.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,7 +17,7 @@ import com.xiaomi.mimoclaw.data.remote.AuthManager
 fun LoginScreen(
     onLoginSuccess: (String) -> Unit,
     onBack: () -> Unit,
-    authManager: AuthManager = AuthManager()
+    authManager: AuthManager = AuthManager(androidx.compose.ui.platform.LocalContext.current)
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var hasDetectedLogin by remember { mutableStateOf(false) }
