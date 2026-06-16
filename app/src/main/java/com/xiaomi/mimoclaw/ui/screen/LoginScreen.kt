@@ -1,319 +1,236 @@
 package com.xiaomi.mimoclaw.ui.screen
 
-import androidx.compose.animation.*
+import android.annotation.SuppressLint
+import android.webkit.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.xiaomi.mimoclaw.data.remote.AuthManager
 import com.xiaomi.mimoclaw.ui.theme.MiMoGradientEnd
 import com.xiaomi.mimoclaw.ui.theme.MiMoGradientStart
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onBack: () -> Unit
+    onLoginSuccess: (String) -> Unit, // returns cookies/auth info
+    onBack: () -> Unit,
+    authManager: AuthManager = AuthManager()
 ) {
-    var account by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var agreedToTerms by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var showPhoneLogin by remember { mutableStateOf(false) }
-    var phoneNumber by remember { mutableStateOf("") }
-    var verificationCode by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    var currentUrl by remember { mutableStateOf("") }
+    var showManualLogin by remember { mutableStateOf(false) }
+    var hasDetectedLogin by remember { mutableStateOf(false) }
 
-    Scaffold { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(60.dp))
+    // Check for existing cookies on launch
+    LaunchedEffect(Unit) {
+        val cookies = authManager.extractAuthCookies()
+        val token = authManager.parseServiceToken(cookies)
+        if (token != null) {
+            onLoginSuccess(cookies ?: "")
+            return@LaunchedEffect
+        }
+    }
 
-            // Logo
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(listOf(MiMoGradientStart, MiMoGradientEnd))
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Mi",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Xiaomi Account",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Tab: Sign in / Sign up
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Sign in",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-                Text(
-                    text = "Sign up",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable { /* TODO */ }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            AnimatedVisibility(
-                visible = !showPhoneLogin,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                Column {
-                    // Account field
-                    OutlinedTextField(
-                        value = account,
-                        onValueChange = { account = it },
-                        label = { Text("Email/Phone/Xiaomi Account") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Person, contentDescription = null)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Password field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = showPhoneLogin,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                Column {
-                    // Phone field
-                    OutlinedTextField(
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
-                        label = { Text("Phone number") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Phone, contentDescription = null)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Verification code
-                    OutlinedTextField(
-                        value = verificationCode,
-                        onValueChange = { verificationCode = it },
-                        label = { Text("Verification code") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Security, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            TextButton(onClick = { /* Send code */ }) {
-                                Text("Send")
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Terms checkbox
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Checkbox(
-                    checked = agreedToTerms,
-                    onCheckedChange = { agreedToTerms = it }
-                )
-                Text(
-                    text = "I've read and agreed to the Xiaomi Account User Agreement and Xiaomi Account Privacy Policy",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { agreedToTerms = !agreedToTerms }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Sign in button
-            Button(
-                onClick = {
-                    isLoading = true
-                    // TODO: actual login
-                    onLoginSuccess()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Xiaomi Account", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                enabled = (account.isNotBlank() && password.isNotBlank() && agreedToTerms) && !isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Sign in", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                actions = {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).padding(end = 16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Links
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                TextButton(onClick = { /* Forgot password */ }) {
-                    Text("Forgot password?")
-                }
-                TextButton(onClick = { showPhoneLogin = !showPhoneLogin }) {
-                    Text(if (showPhoneLogin) "Sign in with account" else "Sign in using phone number")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // More options
-            Text(
-                text = "More options",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
             )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // WebView for Xiaomi OAuth
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
+                    WebView(context).apply {
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            cacheMode = WebSettings.LOAD_DEFAULT
+                        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                        // Enable cookies
+                        val cookieManager = CookieManager.getInstance()
+                        cookieManager.setAcceptCookie(true)
+                        cookieManager.setAcceptThirdPartyCookies(this, true)
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                SocialLoginButton(icon = "支", label = "Alipay", onClick = { /* TODO */ })
-                SocialLoginButton(icon = "微", label = "WeChat", onClick = { /* TODO */ })
-                SocialLoginButton(icon = "Q", label = "QQ", onClick = { /* TODO */ })
-                SocialLoginButton(icon = "微", label = "Weibo", onClick = { /* TODO */ })
-            }
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                isLoading = true
+                                url?.let { currentUrl = it }
+                            }
 
-            Spacer(modifier = Modifier.height(40.dp))
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                isLoading = false
+                                url?.let { currentUrl = it }
+
+                                // Check if we've been redirected back to MiMo Studio
+                                if (url != null && authManager.isCallbackUrl(url) && !hasDetectedLogin) {
+                                    hasDetectedLogin = true
+                                    // Wait a moment for cookies to be set
+                                    view?.postDelayed({
+                                        val cookies = authManager.extractAuthCookies()
+                                        if (cookies != null) {
+                                            onLoginSuccess(cookies)
+                                        }
+                                    }, 1500)
+                                }
+                            }
+
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val url = request?.url?.toString() ?: return false
+                                // Allow Xiaomi domains
+                                if (url.contains("xiaomi.com") ||
+                                    url.contains("mi.com") ||
+                                    url.contains("aistudio.xiaomimimo.com")) {
+                                    return false
+                                }
+                                // Block other external URLs
+                                return true
+                            }
+                        }
+
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                // Could update progress bar here
+                            }
+                        }
+
+                        // Load the Xiaomi login page
+                        loadUrl(authManager.buildLoginUrl())
+                    }
+                }
+            )
         }
     }
 }
 
+/**
+ * Alternative: Simple token-based login (if user has a token/API key)
+ */
 @Composable
-private fun SocialLoginButton(
-    icon: String,
-    label: String,
-    onClick: () -> Unit
+fun TokenLoginScreen(
+    onTokenSubmit: (String) -> Unit,
+    onBack: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = icon,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    var token by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("API Token Login") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                }
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(
+                        Brush.linearGradient(listOf(MiMoGradientStart, MiMoGradientEnd)),
+                        RoundedCornerShape(20.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Key,
+                    null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                "Enter your API Token",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                "You can find your token in System Settings on the web",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = token,
+                onValueChange = { token = it },
+                label = { Text("API Token") },
+                placeholder = { Text("Paste your token here...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = false,
+                maxLines = 3
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { if (token.isNotBlank()) onTokenSubmit(token.trim()) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                enabled = token.isNotBlank()
+            ) {
+                Text("Login", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            }
+        }
     }
 }
