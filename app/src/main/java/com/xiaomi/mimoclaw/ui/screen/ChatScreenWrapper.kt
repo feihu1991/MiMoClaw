@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.xiaomi.mimoclaw.data.model.ChatMode
-import com.xiaomi.mimoclaw.data.model.ChatMessage
-import com.xiaomi.mimoclaw.data.model.Conversation
+import com.xiaomi.mimoclaw.ui.MainViewModel
 import com.xiaomi.mimoclaw.ui.component.Sidebar
 
 @Composable
@@ -17,21 +17,28 @@ fun ChatScreenWrapper(
     onNavigateToSettings: () -> Unit,
     onNavigateToSubscribe: () -> Unit,
     onNavigateToApiService: () -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    viewModel: MainViewModel = hiltViewModel()
 ) {
-    val chatMode = try {
-        ChatMode.valueOf(modeName)
-    } catch (_: Exception) {
-        ChatMode.MIMO_CLAW
-    }
-
+    val chatMode = try { ChatMode.valueOf(modeName) } catch (_: Exception) { ChatMode.MIMO_CLAW }
     var sidebarVisible by remember { mutableStateOf(false) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var currentMode by remember { mutableStateOf(chatMode) }
-    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var conversations by remember { mutableStateOf(listOf<Conversation>()) }
-    var currentConversationId by remember { mutableStateOf(conversationId) }
+
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val currentMode by viewModel.currentMode.collectAsState()
+    val messages by viewModel.currentMessages.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val conversations by viewModel.conversations.collectAsState()
+    val currentConvId by viewModel.currentConversationId.collectAsState()
+
+    // Initialize
+    LaunchedEffect(Unit) {
+        viewModel.setChatMode(chatMode)
+        if (conversationId != "new") {
+            viewModel.loadConversation(conversationId)
+        } else {
+            viewModel.createNewConversation()
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize()) {
         Sidebar(
@@ -40,20 +47,16 @@ fun ChatScreenWrapper(
             conversations = conversations,
             isLoggedIn = isLoggedIn,
             onClose = { sidebarVisible = false },
-            onModeChanged = { currentMode = it },
+            onModeChanged = { viewModel.setChatMode(it) },
             onConversationClick = { conv ->
-                currentConversationId = conv.id
-                // Load messages for this conversation
+                viewModel.loadConversation(conv.id)
                 sidebarVisible = false
             },
             onNewConversation = {
-                currentConversationId = "new"
-                messages = emptyList()
+                viewModel.createNewConversation()
                 sidebarVisible = false
             },
-            onDeleteConversation = { conv ->
-                conversations = conversations.filter { it.id != conv.id }
-            },
+            onDeleteConversation = { viewModel.deleteConversation(it) },
             onLogin = onNavigateToLogin,
             onNavigateToSubscribe = onNavigateToSubscribe,
             onNavigateToApiService = onNavigateToApiService,
@@ -64,24 +67,9 @@ fun ChatScreenWrapper(
             chatMode = currentMode,
             messages = messages,
             isLoading = isLoading,
-            onSendMessage = { content ->
-                // Add user message
-                val userMsg = ChatMessage(
-                    role = com.xiaomi.mimoclaw.data.model.MessageRole.USER,
-                    content = content
-                )
-                messages = messages + userMsg
-
-                // Simulate AI response (replace with actual API call)
-                isLoading = true
-                // TODO: Call ViewModel/Repository to send message
-                isLoading = false
-            },
+            onSendMessage = { viewModel.sendMessage(it) },
             onBack = onBack,
-            onNewConversation = {
-                currentConversationId = "new"
-                messages = emptyList()
-            },
+            onNewConversation = { viewModel.createNewConversation() },
             onToggleSidebar = { sidebarVisible = !sidebarVisible }
         )
     }

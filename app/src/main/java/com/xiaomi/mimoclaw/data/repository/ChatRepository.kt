@@ -1,14 +1,12 @@
 package com.xiaomi.mimoclaw.data.repository
 
 import com.google.gson.Gson
-import com.xiaomi.mimoclaw.data.local.PreferencesManager
+import com.xiaomi.mimoclaw.data.local.*
 import com.xiaomi.mimoclaw.data.model.*
 import com.xiaomi.mimoclaw.data.remote.MiMoApiService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,42 +14,60 @@ import javax.inject.Singleton
 class ChatRepository @Inject constructor(
     private val apiService: MiMoApiService,
     private val preferencesManager: PreferencesManager,
+    private val conversationDao: ConversationDao,
+    private val messageDao: MessageDao,
     private val gson: Gson
 ) {
-    private val conversations = mutableListOf<Conversation>()
-    private val conversationMessages = mutableMapOf<String, MutableList<ChatMessage>>()
-
     private suspend fun getAuthToken(): String {
         val token = preferencesManager.authToken.first() ?: ""
         return if (token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
-    fun getConversations(mode: ChatMode): List<Conversation> {
-        return conversations.filter { it.mode == mode }.sortedByDescending { it.updatedAt }
+    // ── Conversations ──
+
+    fun getConversations(mode: ChatMode): Flow<List<Conversation>> {
+        return conversationDao.getByMode(mode.name).map { entities ->
+            entities.map { it.toDomain() }
+        }
     }
 
-    fun getConversation(id: String): Conversation? = conversations.find { it.id == id }
+    fun getAllConversations(): Flow<List<Conversation>> {
+        return conversationDao.getAll().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
 
-    fun createConversation(mode: ChatMode, title: String = "New conversation"): Conversation {
+    suspend fun getConversation(id: String): Conversation? {
+        return conversationDao.getById(id)?.toDomain()
+    }
+
+    suspend fun createConversation(mode: ChatMode, title: String = "New conversation"): Conversation {
         val conv = Conversation(title = title, mode = mode)
-        conversations.add(conv)
-        conversationMessages[conv.id] = mutableListOf()
+        conversationDao.insert(conv.toEntity())
         return conv
     }
 
-    fun deleteConversation(id: String) {
-        conversations.removeAll { it.id == id }
-        conversationMessages.remove(id)
+    suspend fun deleteConversation(id: String) {
+        messageDao.deleteByConversation(id)
+        conversationDao.deleteById(id)
     }
 
-    fun getMessages(conversationId: String): List<ChatMessage> {
-        return conversationMessages[conversationId] ?: emptyList()
+    suspend fun updateConversationTitle(id: String, title: String) {
+        conversationDao.getById(id)?.let { entity ->
+            conversationDao.update(entity.copy(title = title, updatedAt = System.currentTimeMillis()))
+        }
     }
 
-    /**
-     * Send message with SSE streaming support.
-     * Falls back to non-streaming if streaming fails.
-     */
+    // ── Messages ──
+
+    fun getMessages(conversationId: String): Flow<List<ChatMessage>> {
+        return messageDao.getByConversation(conversationId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    // ── Send Message with Streaming ──
+
     fun sendMessage(
         conversationId: String,
         content: String,
@@ -62,7 +78,8 @@ class ChatRepository @Inject constructor(
             content = content,
             attachments = attachments
         )
-        conversationMessages.getOrPut(conversationId) { mutableListOf() }.add(userMessage)
+        // Save user message
+        messageDao.insert(userMessage.toEntity(conversationId))
         emit(userMessage)
 
         val assistantMessage = ChatMessage(
@@ -70,13 +87,13 @@ class ChatRepository @Inject constructor(
             content = "",
             isStreaming = true
         )
-        conversationMessages[conversationId]!!.add(assistantMessage)
+        messageDao.insert(assistantMessage.toEntity(conversationId))
         emit(assistantMessage)
 
         try {
             val token = getAuthToken()
-            val messages = conversationMessages[conversationId]!!.map {
-                ApiMessage(role = it.role.name.lowercase(), content = it.content)
+            val messages = messageDao.getByConversationSync(conversationId).map {
+                ApiMessage(role = it.role, content = it.content)
             }
             val model = preferencesManager.selectedModel.first()
             val request = ChatRequest(
@@ -87,11 +104,11 @@ class ChatRepository @Inject constructor(
                 maxTokens = 4096
             )
 
-            // Try SSE streaming first
+            // Try SSE streaming
             try {
                 val response = apiService.chatCompletionsStream(token, request)
                 if (response.isSuccessful) {
-                    val body = response.body() ?: throw Exception("Empty response body")
+                    val body = response.body() ?: throw Exception("Empty response")
                     val reader = body.byteStream().bufferedReader()
                     val contentBuilder = StringBuilder()
 
@@ -109,52 +126,44 @@ class ChatRepository @Inject constructor(
                                             content = contentBuilder.toString(),
                                             isStreaming = true
                                         )
-                                        val msgs = conversationMessages[conversationId]!!
-                                        msgs[msgs.lastIndex] = updated
+                                        messageDao.update(updated.toEntity(conversationId))
                                         emit(updated)
                                     }
-                                } catch (_: Exception) { /* skip malformed chunks */ }
+                                } catch (_: Exception) {}
                             }
                         }
                     }
 
-                    // Final message
                     val finalMsg = assistantMessage.copy(
                         content = contentBuilder.toString().ifEmpty { "No response received." },
                         isStreaming = false
                     )
-                    val msgs = conversationMessages[conversationId]!!
-                    msgs[msgs.lastIndex] = finalMsg
+                    messageDao.update(finalMsg.toEntity(conversationId))
                     emit(finalMsg)
 
-                    // Auto-generate title from first exchange
-                    if (conversationMessages[conversationId]!!.size == 2) {
-                        val title = content.take(30).replace("\n", " ")
-                        updateConversationTitle(conversationId, title)
+                    // Auto-generate title
+                    val msgCount = messageDao.getByConversationSync(conversationId).size
+                    if (msgCount == 2) {
+                        updateConversationTitle(conversationId, content.take(30).replace("\n", " "))
                     }
                     return@flow
                 }
-            } catch (e: Exception) {
-                // Streaming failed, fall through to non-streaming
-            }
+            } catch (_: Exception) {}
 
             // Fallback: non-streaming
             val response = apiService.chatCompletions(token, request)
             if (response.isSuccessful) {
-                val result = response.body()
-                val reply = result?.choices?.firstOrNull()?.message?.content
+                val reply = response.body()?.choices?.firstOrNull()?.message?.content
                     ?: "No response received."
                 val finalMsg = assistantMessage.copy(content = reply, isStreaming = false)
-                val msgs = conversationMessages[conversationId]!!
-                msgs[msgs.lastIndex] = finalMsg
+                messageDao.update(finalMsg.toEntity(conversationId))
                 emit(finalMsg)
             } else {
                 val errorMsg = assistantMessage.copy(
                     content = "Error ${response.code()}: ${response.message()}",
                     isStreaming = false
                 )
-                val msgs = conversationMessages[conversationId]!!
-                msgs[msgs.lastIndex] = errorMsg
+                messageDao.update(errorMsg.toEntity(conversationId))
                 emit(errorMsg)
             }
         } catch (e: Exception) {
@@ -162,15 +171,43 @@ class ChatRepository @Inject constructor(
                 content = "Network error: ${e.message ?: "Unknown error"}",
                 isStreaming = false
             )
-            val msgs = conversationMessages[conversationId]!!
-            msgs[msgs.lastIndex] = errorMsg
+            messageDao.update(errorMsg.toEntity(conversationId))
             emit(errorMsg)
         }
     }.flowOn(Dispatchers.IO)
-
-    fun updateConversationTitle(conversationId: String, title: String) {
-        conversations.indexOfFirst { it.id == conversationId }.takeIf { it >= 0 }?.let { idx ->
-            conversations[idx] = conversations[idx].copy(title = title, updatedAt = System.currentTimeMillis())
-        }
-    }
 }
+
+// ── Mapping Extensions ──
+
+private fun ConversationEntity.toDomain() = Conversation(
+    id = id,
+    title = title,
+    mode = ChatMode.valueOf(mode),
+    createdAt = createdAt,
+    updatedAt = updatedAt
+)
+
+private fun Conversation.toEntity() = ConversationEntity(
+    id = id,
+    title = title,
+    mode = mode.name,
+    createdAt = createdAt,
+    updatedAt = updatedAt
+)
+
+private fun MessageEntity.toDomain() = ChatMessage(
+    id = id,
+    role = MessageRole.valueOf(role.uppercase()),
+    content = content,
+    timestamp = timestamp,
+    isStreaming = isStreaming
+)
+
+private fun ChatMessage.toEntity(conversationId: String) = MessageEntity(
+    id = id,
+    conversationId = conversationId,
+    role = role.name.lowercase(),
+    content = content,
+    timestamp = timestamp,
+    isStreaming = isStreaming
+)

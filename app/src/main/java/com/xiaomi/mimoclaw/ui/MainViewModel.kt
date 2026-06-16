@@ -16,7 +16,7 @@ class MainViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
-    // Auth state
+    // Auth
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
@@ -24,36 +24,37 @@ class MainViewModel @Inject constructor(
     val user: StateFlow<User?> = _user.asStateFlow()
 
     // Theme
-    val themeMode: StateFlow<ThemeMode> = preferencesManager.themeMode
+    val themeMode = preferencesManager.themeMode
         .map { ThemeMode.valueOf(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
 
-    val fontSize: StateFlow<FontSize> = preferencesManager.fontSize
-        .map { FontSize.valueOf(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FontSize.MEDIUM)
-
     // Model
-    val selectedModel: StateFlow<String> = preferencesManager.selectedModel
+    val selectedModel = preferencesManager.selectedModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "MiMo-V2.5-Pro")
 
-    // Chat state
-    private val _currentMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val currentMessages: StateFlow<List<ChatMessage>> = _currentMessages.asStateFlow()
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
+    // Current conversation
     private val _currentConversationId = MutableStateFlow<String?>(null)
-
-    // Conversations
-    private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
-    val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
+    val currentConversationId: StateFlow<String?> = _currentConversationId.asStateFlow()
 
     private val _currentMode = MutableStateFlow(ChatMode.MIMO_CLAW)
     val currentMode: StateFlow<ChatMode> = _currentMode.asStateFlow()
 
+    // Messages for current conversation
+    val currentMessages: StateFlow<List<ChatMessage>> = _currentConversationId
+        .filterNotNull()
+        .flatMapLatest { id -> chatRepository.getMessages(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Conversations list
+    val conversations: StateFlow<List<Conversation>> = _currentMode
+        .flatMapLatest { mode -> chatRepository.getConversations(mode) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Loading state
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     init {
-        // Check for saved auth token
         viewModelScope.launch {
             preferencesManager.authToken.collect { token ->
                 _isLoggedIn.value = token != null
@@ -63,63 +64,48 @@ class MainViewModel @Inject constructor(
 
     fun setChatMode(mode: ChatMode) {
         _currentMode.value = mode
-        _conversations.value = chatRepository.getConversations(mode)
     }
 
-    fun createNewConversation(mode: ChatMode) {
-        val conv = chatRepository.createConversation(mode)
-        _currentConversationId.value = conv.id
-        _currentMessages.value = emptyList()
-        _conversations.value = chatRepository.getConversations(mode)
-    }
-
-    fun loadConversation(conversationId: String) {
-        _currentConversationId.value = conversationId
-        _currentMessages.value = chatRepository.getMessages(conversationId)
-    }
-
-    fun sendMessage(content: String, attachments: List<Attachment> = emptyList()) {
-        val convId = _currentConversationId.value ?: run {
+    fun createNewConversation() {
+        viewModelScope.launch {
             val conv = chatRepository.createConversation(_currentMode.value)
             _currentConversationId.value = conv.id
-            conv.id
         }
+    }
 
-        viewModelScope.launch {
-            _isLoading.value = true
-            chatRepository.sendMessage(convId, content, attachments).collect { message ->
-                _currentMessages.value = chatRepository.getMessages(convId)
-            }
-            _isLoading.value = false
-            _conversations.value = chatRepository.getConversations(_currentMode.value)
-        }
+    fun loadConversation(id: String) {
+        _currentConversationId.value = id
     }
 
     fun deleteConversation(conversation: Conversation) {
-        chatRepository.deleteConversation(conversation.id)
-        if (_currentConversationId.value == conversation.id) {
-            _currentConversationId.value = null
-            _currentMessages.value = emptyList()
-        }
-        _conversations.value = chatRepository.getConversations(_currentMode.value)
-    }
-
-    fun updateThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
-            preferencesManager.saveThemeMode(mode.name)
+            chatRepository.deleteConversation(conversation.id)
+            if (_currentConversationId.value == conversation.id) {
+                _currentConversationId.value = null
+            }
         }
     }
 
-    fun updateFontSize(size: FontSize) {
-        viewModelScope.launch {
-            preferencesManager.saveFontSize(size.name)
+    fun sendMessage(content: String) {
+        val convId = _currentConversationId.value
+        if (convId == null) {
+            // Create conversation first
+            viewModelScope.launch {
+                val conv = chatRepository.createConversation(_currentMode.value)
+                _currentConversationId.value = conv.id
+                doSendMessage(conv.id, content)
+            }
+        } else {
+            viewModelScope.launch {
+                doSendMessage(convId, content)
+            }
         }
     }
 
-    fun updateSelectedModel(model: String) {
-        viewModelScope.launch {
-            preferencesManager.saveSelectedModel(model)
-        }
+    private suspend fun doSendMessage(conversationId: String, content: String) {
+        _isLoading.value = true
+        chatRepository.sendMessage(conversationId, content).collect { }
+        _isLoading.value = false
     }
 
     fun login(token: String, user: User) {
@@ -137,7 +123,14 @@ class MainViewModel @Inject constructor(
             _isLoggedIn.value = false
             _user.value = null
             _currentConversationId.value = null
-            _currentMessages.value = emptyList()
         }
+    }
+
+    fun updateThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { preferencesManager.saveThemeMode(mode.name) }
+    }
+
+    fun updateSelectedModel(model: String) {
+        viewModelScope.launch { preferencesManager.saveSelectedModel(model) }
     }
 }

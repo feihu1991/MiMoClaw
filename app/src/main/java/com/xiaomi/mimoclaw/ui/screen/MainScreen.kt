@@ -4,8 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.xiaomi.mimoclaw.data.model.ChatMode
-import com.xiaomi.mimoclaw.data.model.Conversation
+import com.xiaomi.mimoclaw.ui.MainViewModel
 import com.xiaomi.mimoclaw.ui.component.Sidebar
 
 @Composable
@@ -14,47 +15,39 @@ fun MainScreen(
     onNavigateToChat: (ChatMode, String) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToSubscribe: () -> Unit,
-    onNavigateToApiService: () -> Unit
+    onNavigateToApiService: () -> Unit,
+    viewModel: MainViewModel = hiltViewModel()
 ) {
     var sidebarVisible by remember { mutableStateOf(false) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var currentMode by remember { mutableStateOf(ChatMode.MIMO_CLAW) }
-    var conversations by remember { mutableStateOf(listOf<Conversation>()) }
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val currentMode by viewModel.currentMode.collectAsState()
+    val conversations by viewModel.conversations.collectAsState()
 
     Row(modifier = Modifier.fillMaxSize()) {
-        // Sidebar
         Sidebar(
             isVisible = sidebarVisible,
             currentMode = currentMode,
             conversations = conversations,
             isLoggedIn = isLoggedIn,
             onClose = { sidebarVisible = false },
-            onModeChanged = { currentMode = it },
+            onModeChanged = { viewModel.setChatMode(it) },
             onConversationClick = { conv ->
                 onNavigateToChat(conv.mode, conv.id)
             },
             onNewConversation = {
                 onNavigateToChat(currentMode, "new")
             },
-            onDeleteConversation = { conv ->
-                conversations = conversations.filter { it.id != conv.id }
-            },
+            onDeleteConversation = { viewModel.deleteConversation(it) },
             onLogin = onNavigateToLogin,
             onNavigateToSubscribe = onNavigateToSubscribe,
             onNavigateToApiService = onNavigateToApiService,
             onNavigateToSettings = onNavigateToSettings
         )
 
-        // Main content
         HomeScreen(
-            onStartChat = { mode ->
-                onNavigateToChat(mode, "new")
-            },
+            onStartChat = { mode -> onNavigateToChat(mode, "new") },
             onNavigateToSubscribe = onNavigateToSubscribe,
             isLoggedIn = isLoggedIn
         )
     }
-
-    // Toggle sidebar with menu button in top bar
-    // This is handled via the top bar in a real app
 }
