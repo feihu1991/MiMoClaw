@@ -14,7 +14,6 @@ import com.xiaomi.mimoclaw.ui.screen.*
 object Routes {
     const val HOME = "home"
     const val LOGIN = "login"
-    const val TOKEN_LOGIN = "token_login"
     const val CHAT = "chat/{mode}/{conversationId}"
     const val SETTINGS = "settings"
     const val SUBSCRIBE = "subscribe"
@@ -52,22 +51,6 @@ fun MiMoNavGraph(
                     viewModel.login(cookies, com.xiaomi.mimoclaw.data.model.User(
                         userId = "web_user",
                         nickname = "User",
-                        avatar = null,
-                        email = null,
-                        phone = null
-                    ))
-                    navController.popBackStack()
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Routes.TOKEN_LOGIN) {
-            TokenLoginScreen(
-                onTokenSubmit = { token ->
-                    viewModel.login(token, com.xiaomi.mimoclaw.data.model.User(
-                        userId = "token_user",
-                        nickname = "API User",
                         avatar = null,
                         email = null,
                         phone = null

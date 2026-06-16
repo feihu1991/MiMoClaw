@@ -1,26 +1,16 @@
 package com.xiaomi.mimoclaw.ui.screen
 
-import android.annotation.SuppressLint
 import android.webkit.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.xiaomi.mimoclaw.data.remote.AuthManager
-import com.xiaomi.mimoclaw.ui.theme.MiMoGradientEnd
-import com.xiaomi.mimoclaw.ui.theme.MiMoGradientStart
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,93 +134,4 @@ fun LoginScreen(
     }
 }
 
-/**
- * Alternative: Simple token-based login (if user has a token/API key)
- */
-@Composable
-fun TokenLoginScreen(
-    onTokenSubmit: (String) -> Unit,
-    onBack: () -> Unit
-) {
-    var token by remember { mutableStateOf("") }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("API Token Login") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .background(
-                        Brush.linearGradient(listOf(MiMoGradientStart, MiMoGradientEnd)),
-                        RoundedCornerShape(20.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Key,
-                    null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "Enter your API Token",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                "You can find your token in System Settings on the web",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            OutlinedTextField(
-                value = token,
-                onValueChange = { token = it },
-                label = { Text("API Token") },
-                placeholder = { Text("Paste your token here...") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = false,
-                maxLines = 3
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = { if (token.isNotBlank()) onTokenSubmit(token.trim()) },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                enabled = token.isNotBlank()
-            ) {
-                Text("Login", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            }
-        }
-    }
-}
