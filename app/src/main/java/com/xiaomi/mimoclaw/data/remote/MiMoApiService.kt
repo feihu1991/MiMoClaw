@@ -9,7 +9,7 @@ interface MiMoApiService {
 
     companion object {
         const val BASE_URL = "https://aistudio.xiaomimimo.com"
-        const val API_BASE = "$BASE_URL/api/v1/"
+        const val API_BASE = "https://token-plan-cn.xiaomimimo.com/v1/"
     }
 
     // ── Auth ──

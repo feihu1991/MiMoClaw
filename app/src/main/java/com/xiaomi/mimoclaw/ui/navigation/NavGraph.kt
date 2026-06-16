@@ -1,8 +1,6 @@
 package com.xiaomi.mimoclaw.ui.navigation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -32,9 +30,18 @@ fun MiMoNavGraph(
 ) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
+    // 监听登录状态，自动跳转
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            navController.navigate(Routes.HOME) {
+                popUpTo(Routes.LOGIN) { inclusive = true }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
-        startDestination = if (isLoggedIn) Routes.HOME else Routes.LOGIN,
+        startDestination = Routes.LOGIN,
         modifier = modifier
     ) {
         // ── 登录页 ──
@@ -48,11 +55,9 @@ fun MiMoNavGraph(
                         email = null,
                         phone = null
                     ))
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
-                    }
+                    // LaunchedEffect 会处理跳转
                 },
-                onBack = { /* 首页不允许返回 */ }
+                onBack = { }
             )
         }
 
