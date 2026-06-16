@@ -38,33 +38,30 @@ fun MessageInput(
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Input row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Attachment button
                 if (onAttach != null) {
                     IconButton(
                         onClick = onAttach,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Attachment,
-                            contentDescription = "Attach",
+                            Icons.Default.Attachment,
+                            contentDescription = "附件",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
-                // Text field
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     placeholder = {
                         Text(
-                            "Type a message…",
+                            "输入消息…",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
@@ -84,7 +81,6 @@ fun MessageInput(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Send button
                 AnimatedVisibility(
                     visible = text.isNotBlank(),
                     enter = fadeIn(),
@@ -94,9 +90,7 @@ fun MessageInput(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(listOf(MiMoGradientStart, MiMoGradientEnd))
-                            ),
+                            .background(Brush.linearGradient(listOf(MiMoGradientStart, MiMoGradientEnd))),
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
@@ -109,8 +103,8 @@ fun MessageInput(
                             enabled = !isLoading
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "发送",
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -118,28 +112,26 @@ fun MessageInput(
                     }
                 }
 
-                // Mic button (when empty)
                 AnimatedVisibility(
                     visible = text.isBlank(),
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
                     IconButton(
-                        onClick = { /* Voice input */ },
+                        onClick = { },
                         modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Voice",
+                            Icons.Default.Mic,
+                            contentDescription = "语音",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
 
-            // Disclaimer
             Text(
-                text = "AI-generated content may be inaccurate.",
+                text = "AI 生成内容可能不准确。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                 modifier = Modifier

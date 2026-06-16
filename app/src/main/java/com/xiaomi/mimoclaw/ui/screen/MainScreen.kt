@@ -47,6 +47,7 @@ fun MainScreen(
         HomeScreen(
             onStartChat = { mode -> onNavigateToChat(mode, "new") },
             onNavigateToSubscribe = onNavigateToSubscribe,
+            onNavigateToLogin = onNavigateToLogin,
             isLoggedIn = isLoggedIn
         )
     }

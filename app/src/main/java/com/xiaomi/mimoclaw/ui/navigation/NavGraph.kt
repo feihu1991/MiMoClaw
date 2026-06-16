@@ -1,6 +1,8 @@
 package com.xiaomi.mimoclaw.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -12,8 +14,8 @@ import com.xiaomi.mimoclaw.ui.MainViewModel
 import com.xiaomi.mimoclaw.ui.screen.*
 
 object Routes {
-    const val HOME = "home"
     const val LOGIN = "login"
+    const val HOME = "home"
     const val CHAT = "chat/{mode}/{conversationId}"
     const val SETTINGS = "settings"
     const val SUBSCRIBE = "subscribe"
@@ -28,11 +30,33 @@ fun MiMoNavGraph(
     viewModel: MainViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME,
+        startDestination = if (isLoggedIn) Routes.HOME else Routes.LOGIN,
         modifier = modifier
     ) {
+        // ── 登录页 ──
+        composable(Routes.LOGIN) {
+            LoginScreen(
+                onLoginSuccess = { cookies ->
+                    viewModel.login(cookies, com.xiaomi.mimoclaw.data.model.User(
+                        userId = "web_user",
+                        nickname = "用户",
+                        avatar = null,
+                        email = null,
+                        phone = null
+                    ))
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onBack = { /* 首页不允许返回 */ }
+            )
+        }
+
+        // ── 首页 ──
         composable(Routes.HOME) {
             MainScreen(
                 onNavigateToLogin = { navController.navigate(Routes.LOGIN) },
@@ -45,22 +69,7 @@ fun MiMoNavGraph(
             )
         }
 
-        composable(Routes.LOGIN) {
-            LoginScreen(
-                onLoginSuccess = { cookies ->
-                    viewModel.login(cookies, com.xiaomi.mimoclaw.data.model.User(
-                        userId = "web_user",
-                        nickname = "User",
-                        avatar = null,
-                        email = null,
-                        phone = null
-                    ))
-                    navController.popBackStack()
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
+        // ── 聊天页 ──
         composable(
             route = Routes.CHAT,
             arguments = listOf(
@@ -81,20 +90,25 @@ fun MiMoNavGraph(
             )
         }
 
+        // ── 设置页 ──
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onLogout = {
                     viewModel.logout()
-                    navController.popBackStack(Routes.HOME, inclusive = false)
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
                 }
             )
         }
 
+        // ── 订阅页 ──
         composable(Routes.SUBSCRIBE) {
             SubscribeScreen(onBack = { navController.popBackStack() })
         }
 
+        // ── API 服务页 ──
         composable(Routes.API_SERVICE) {
             ApiServiceScreen(onBack = { navController.popBackStack() })
         }

@@ -53,7 +53,7 @@ fun Sidebar(
             tonalElevation = 1.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // ── Header ──
+                // ── 头部 ──
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -72,12 +72,12 @@ fun Sidebar(
                         Spacer(modifier = Modifier.width(10.dp))
                         Text("MiMo Claw", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
-                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close sidebar") }
+                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, "关闭") }
                 }
 
                 HorizontalDivider()
 
-                // ── Mode selector ──
+                // ── 模式切换 ──
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -95,7 +95,7 @@ fun Sidebar(
                     }
                 }
 
-                // ── New conversation ──
+                // ── 新建对话 ──
                 OutlinedButton(
                     onClick = onNewConversation,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -103,12 +103,12 @@ fun Sidebar(
                 ) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("New conversation")
+                    Text("新建对话")
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ── Conversation list ──
+                // ── 对话列表 ──
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 8.dp)
@@ -123,7 +123,7 @@ fun Sidebar(
                     if (conversations.isEmpty()) {
                         item {
                             Text(
-                                "No conversations yet",
+                                "暂无对话",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.fillMaxWidth().padding(24.dp),
@@ -135,10 +135,9 @@ fun Sidebar(
 
                 HorizontalDivider()
 
-                // ── Bottom section ──
+                // ── 底部区域 ──
                 Column(modifier = Modifier.padding(12.dp)) {
                     if (!isLoggedIn) {
-                        // Login card
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable(onClick = onLogin),
                             shape = RoundedCornerShape(12.dp),
@@ -148,14 +147,13 @@ fun Sidebar(
                                 Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Sign in", fontWeight = FontWeight.SemiBold)
-                                    Text("Unlock more resource benefits", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("登录", fontWeight = FontWeight.SemiBold)
+                                    Text("登录解锁更多资源权益", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
                             }
                         }
                     } else {
-                        // User profile with plan info
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable { onNavigateToSettings() },
                             shape = RoundedCornerShape(12.dp),
@@ -174,22 +172,15 @@ fun Sidebar(
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text("User", fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "Standard Annual",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Text("用户", fontWeight = FontWeight.SemiBold)
+                                        Text("Standard Annual", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    TextButton(onClick = onNavigateToSubscribe) { Text("Upgrade") }
+                                    TextButton(onClick = onNavigateToSubscribe) { Text("升级") }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("366 days left", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                    Text("1% credits used", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("剩余 366 天", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text("已用 1% 算力", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                 }
                             }
                         }
@@ -197,24 +188,22 @@ fun Sidebar(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Bottom nav items
-                    SidebarNavItem(icon = Icons.Default.Settings, label = "System Settings", onClick = onNavigateToSettings)
-                    SidebarNavItem(icon = Icons.Default.Code, label = "API Service", onClick = onNavigateToApiService)
-                    SidebarNavItem(icon = Icons.Default.Folder, label = "Files", onClick = { /* TODO */ })
+                    SidebarNavItem(icon = Icons.Default.Settings, label = "系统设置", onClick = onNavigateToSettings)
+                    SidebarNavItem(icon = Icons.Default.Code, label = "API 服务", onClick = onNavigateToApiService)
+                    SidebarNavItem(icon = Icons.Default.Folder, label = "文件", onClick = { })
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Chat groups
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssistChip(
-                            onClick = { /* TODO */ },
-                            label = { Text("Chat group") },
+                            onClick = { },
+                            label = { Text("交流群") },
                             leadingIcon = { Icon(Icons.Default.Group, null, modifier = Modifier.size(16.dp)) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
-                            onClick = { /* TODO */ },
-                            label = { Text("Feedback") },
+                            onClick = { },
+                            label = { Text("反馈群") },
                             leadingIcon = { Icon(Icons.Default.Feedback, null, modifier = Modifier.size(16.dp)) },
                             modifier = Modifier.weight(1f)
                         )
@@ -250,7 +239,7 @@ private fun ConversationItem(conversation: Conversation, onClick: () -> Unit, on
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Delete") },
+                        text = { Text("删除") },
                         leadingIcon = { Icon(Icons.Default.Delete, null) },
                         onClick = { showMenu = false; onDelete() }
                     )
@@ -279,9 +268,9 @@ private fun SidebarNavItem(icon: androidx.compose.ui.graphics.vector.ImageVector
 private fun formatTimestamp(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     return when {
-        diff < 60_000 -> "Just now"
-        diff < 3600_000 -> "${diff / 60_000}m ago"
-        diff < 86400_000 -> "${diff / 3600_000}h ago"
+        diff < 60_000 -> "刚刚"
+        diff < 3600_000 -> "${diff / 60_000} 分钟前"
+        diff < 86400_000 -> "${diff / 3600_000} 小时前"
         else -> SimpleDateFormat("MM/dd", Locale.getDefault()).format(Date(timestamp))
     }
 }

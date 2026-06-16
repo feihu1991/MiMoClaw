@@ -11,20 +11,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.xiaomi.mimoclaw.data.remote.AuthManager
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (String) -> Unit, // returns cookies/auth info
+    onLoginSuccess: (String) -> Unit,
     onBack: () -> Unit,
     authManager: AuthManager = AuthManager()
 ) {
     var isLoading by remember { mutableStateOf(true) }
-    var currentUrl by remember { mutableStateOf("") }
-    var showManualLogin by remember { mutableStateOf(false) }
     var hasDetectedLogin by remember { mutableStateOf(false) }
 
-    // Check for existing cookies on launch
+    // 检查是否已有登录态
     LaunchedEffect(Unit) {
         val cookies = authManager.extractAuthCookies()
         val token = authManager.parseServiceToken(cookies)
@@ -37,10 +34,10 @@ fun LoginScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Xiaomi Account", fontWeight = FontWeight.SemiBold) },
+                title = { Text("小米账号登录") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
                 actions = {
@@ -54,84 +51,57 @@ fun LoginScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // WebView for Xiaomi OAuth
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    WebView(context).apply {
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            setSupportZoom(true)
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                            cacheMode = WebSettings.LOAD_DEFAULT
-                        }
-
-                        // Enable cookies
-                        val cookieManager = CookieManager.getInstance()
-                        cookieManager.setAcceptCookie(true)
-                        cookieManager.setAcceptThirdPartyCookies(this, true)
-
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                super.onPageStarted(view, url, favicon)
-                                isLoading = true
-                                url?.let { currentUrl = it }
-                            }
-
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                isLoading = false
-                                url?.let { currentUrl = it }
-
-                                // Check if we've been redirected back to MiMo Studio
-                                if (url != null && authManager.isCallbackUrl(url) && !hasDetectedLogin) {
-                                    hasDetectedLogin = true
-                                    // Wait a moment for cookies to be set
-                                    view?.postDelayed({
-                                        val cookies = authManager.extractAuthCookies()
-                                        if (cookies != null) {
-                                            onLoginSuccess(cookies)
-                                        }
-                                    }, 1500)
-                                }
-                            }
-
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView?,
-                                request: WebResourceRequest?
-                            ): Boolean {
-                                val url = request?.url?.toString() ?: return false
-                                // Allow Xiaomi domains
-                                if (url.contains("xiaomi.com") ||
-                                    url.contains("mi.com") ||
-                                    url.contains("aistudio.xiaomimimo.com")) {
-                                    return false
-                                }
-                                // Block other external URLs
-                                return true
-                            }
-                        }
-
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                // Could update progress bar here
-                            }
-                        }
-
-                        // Load the Xiaomi login page
-                        loadUrl(authManager.buildLoginUrl())
+        AndroidView(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            factory = { context ->
+                WebView(context).apply {
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        databaseEnabled = true
+                        setSupportZoom(true)
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        cacheMode = WebSettings.LOAD_DEFAULT
                     }
+
+                    val cookieManager = CookieManager.getInstance()
+                    cookieManager.setAcceptCookie(true)
+                    cookieManager.setAcceptThirdPartyCookies(this, true)
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            isLoading = true
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isLoading = false
+
+                            if (url != null && authManager.isCallbackUrl(url) && !hasDetectedLogin) {
+                                hasDetectedLogin = true
+                                view?.postDelayed({
+                                    val cookies = authManager.extractAuthCookies()
+                                    if (cookies != null) {
+                                        onLoginSuccess(cookies)
+                                    }
+                                }, 1500)
+                            }
+                        }
+
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            val url = request?.url?.toString() ?: return false
+                            return !(url.contains("xiaomi.com") || url.contains("mi.com") || url.contains("aistudio.xiaomimimo.com"))
+                        }
+                    }
+
+                    loadUrl(authManager.buildLoginUrl())
                 }
-            )
-        }
+            }
+        )
     }
 }
-
-

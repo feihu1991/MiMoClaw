@@ -71,89 +71,75 @@ fun ChatScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNewConversation) { Icon(Icons.Default.Add, "New conversation") }
-                    IconButton(onClick = onToggleSidebar) { Icon(Icons.Default.Menu, "Sidebar") }
+                    IconButton(onClick = onNewConversation) { Icon(Icons.Default.Add, "新对话") }
+                    IconButton(onClick = onToggleSidebar) { Icon(Icons.Default.Menu, "侧边栏") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         bottomBar = {
-            // Bottom bar with model selector + input + tool buttons
             Column {
-                // Tool buttons row (Message Channel, Skills, WPS Office)
+                // 工具栏
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AssistChip(
-                        onClick = { /* Message Channel */ },
-                        label = { Text("Message Channel", style = MaterialTheme.typography.labelSmall) },
+                        onClick = { },
+                        label = { Text("消息通道", style = MaterialTheme.typography.labelSmall) },
                         leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(14.dp)) },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(32.dp)
                     )
                     AssistChip(
-                        onClick = { /* Skills */ },
-                        label = { Text("Skills", style = MaterialTheme.typography.labelSmall) },
+                        onClick = { },
+                        label = { Text("技能", style = MaterialTheme.typography.labelSmall) },
                         leadingIcon = { Icon(Icons.Default.Extension, null, modifier = Modifier.size(14.dp)) },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(32.dp)
                     )
                     AssistChip(
-                        onClick = { /* WPS Office */ },
-                        label = { Text("WPS Office", style = MaterialTheme.typography.labelSmall) },
+                        onClick = { },
+                        label = { Text("WPS 办公", style = MaterialTheme.typography.labelSmall) },
                         leadingIcon = { Icon(Icons.Default.Description, null, modifier = Modifier.size(14.dp)) },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(32.dp)
                     )
                 }
 
-                // Model selector
+                // 模型选择
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { /* Model picker */ }
+                        modifier = Modifier.clickable { }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "MiMo-V2.5-Pro",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("MiMo-V2.5-Pro", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
 
-                MessageInput(onSend = onSendMessage, isLoading = isLoading, onAttach = { /* TODO */ })
+                MessageInput(onSend = onSendMessage, isLoading = isLoading, onAttach = { })
             }
         }
     ) { padding ->
         if (messages.isEmpty()) {
             EmptyChatState(
                 chatMode = chatMode,
-                onStartChat = { suggestion -> onSendMessage(suggestion) },
+                onStartChat = { onSendMessage(it) },
                 modifier = Modifier.fillMaxSize().padding(padding)
             )
         } else {
@@ -209,10 +195,10 @@ private fun EmptyChatState(chatMode: ChatMode, onStartChat: (String) -> Unit, mo
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text(chatMode.tagline, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text("开始对话", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Start a conversation or try one of the suggestions below",
+            "输入消息或点击下方建议开始",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -220,19 +206,11 @@ private fun EmptyChatState(chatMode: ChatMode, onStartChat: (String) -> Unit, mo
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Curated showcase ideas (matching web UI)
-        Text(
-            "Spark inspiration with curated examples",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
         val suggestions = listOf(
-            "🌐 Web design" to "Create a responsive landing page",
-            "📝 Script and narration" to "Write a short video script",
-            "📊 Sales data analysis" to "Analyze Q2 sales trends",
-            "📰 Daily news digest" to "Summarize today's top stories"
+            "🌐 网页设计" to "创建一个响应式着陆页",
+            "📝 脚本与旁白" to "写一个短视频脚本",
+            "📊 销售数据分析" to "分析 Q2 销售趋势",
+            "📰 每日新闻摘要" to "总结今日热点"
         )
 
         suggestions.forEach { (label, _) ->

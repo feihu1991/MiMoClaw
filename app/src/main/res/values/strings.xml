@@ -1,57 +1,119 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MiMo Claw</string>
-    <string name="login_title">Xiaomi Account</string>
-    <string name="login_email_hint">Email/Phone/Xiaomi Account</string>
-    <string name="login_password_hint">Password</string>
-    <string name="login_button">Sign in</string>
-    <string name="login_agree_text">I\'ve read and agreed to the Xiaomi Account User Agreement and Xiaomi Account Privacy Policy</string>
-    <string name="login_forgot_password">Forgot password?</string>
-    <string name="login_phone_signin">Sign in using phone number</string>
-    <string name="login_more_options">More options</string>
-    <string name="login_alipay">Sign in with Alipay</string>
-    <string name="login_wechat">Sign in with WeChat</string>
-    <string name="login_qq">Sign in with QQ</string>
-    <string name="login_weibo">Sign in with Weibo</string>
 
-    <string name="nav_mimo_claw">MiMo Claw</string>
-    <string name="nav_mimo_chat">MiMo Chat</string>
-    <string name="nav_new_conversation">New conversation</string>
-    <string name="nav_api_service">API Service</string>
-    <string name="nav_subscribe">Subscribe</string>
-    <string name="nav_settings">Settings</string>
+    <!-- Login -->
+    <string name="login_title">小米账号登录</string>
+    <string name="login_account_hint">邮箱/手机号/小米账号</string>
+    <string name="login_password_hint">密码</string>
+    <string name="login_button">登录</string>
+    <string name="login_agree">我已阅读并同意小米账号用户协议和隐私政策</string>
+    <string name="login_forgot">忘记密码？</string>
+    <string name="login_phone">手机号登录</string>
+    <string name="login_more">其他方式登录</string>
+    <string name="login_success">登录成功</string>
+    <string name="login_failed">登录失败</string>
 
-    <string name="chat_input_hint">Type a message…</string>
-    <string name="chat_send">Send</string>
-    <string name="chat_thinking">Thinking…</string>
-    <string name="chat_error">Something went wrong. Please try again.</string>
+    <!-- Home -->
+    <string name="home_subtitle">文档生成、资讯聚合、内容创作、开发提效、数据分析——解锁无限可能。</string>
+    <string name="home_create">立即创建</string>
+    <string name="home_try">立即体验</string>
+    <string name="home_signin">登录</string>
+    <string name="home_signin_desc">登录解锁更多资源权益</string>
+    <string name="home_subscribe">订阅</string>
 
-    <string name="home_title">Your personal assistant</string>
-    <string name="home_subtitle">document generation, news aggregation, content creation, development efficiency, data analysis — unlocking endless possibilities.</string>
-    <string name="home_create_now">Create Now</string>
-    <string name="home_try_now">Try Now</string>
+    <!-- Features -->
+    <string name="feature_model">小米 MiMo 旗舰模型</string>
+    <string name="feature_model_desc">MiMo-V2.5-Pro 旗舰模型与 OpenClaw 原生深度适配，多模态识别+语音播放。</string>
+    <string name="feature_office">金山办公生态</string>
+    <string name="feature_office_desc">高质量文档生成、在线预览、在线编辑，一站式 Agent 办公闭环。</string>
+    <string name="feature_tokenplan">TokenPlan 算力保障</string>
+    <string name="feature_tokenplan_desc">创建即免费，各档位 TokenPlan 订阅，灵活共享算力配额。</string>
+    <string name="feature_cloud">开箱即用，云端托管</string>
+    <string name="feature_cloud_desc">快速获得 7×24h 个人工作 Claw，云端托管、无需部署、低门槛接入 AI Agent。</string>
 
-    <string name="feature_flagship_model">Xiaomi MiMo Flagship Model</string>
-    <string name="feature_flagship_desc">MiMo-V2.5-Pro flagship model is deeply adapted to OpenClaw, with multimodal recognition and voice playback.</string>
-    <string name="feature_office">Kingsoft Office Ecosystem</string>
-    <string name="feature_office_desc">High-quality document generation, online preview, and online editing connect a one-stop Agent office loop.</string>
-    <string name="feature_tokenplan">TokenPlan Compute Guarantee</string>
-    <string name="feature_tokenplan_desc">Free on creation, with TokenPlan subscriptions at every tier for flexible shared compute quotas.</string>
-    <string name="feature_cloud">Ready to Use, Cloud Hosted</string>
-    <string name="feature_cloud_desc">Quickly get a 7×24h personal working Claw with cloud hosting, no deployment, and low-barrier AI Agent access.</string>
+    <!-- Sidebar -->
+    <string name="sidebar_hide">收起侧边栏</string>
+    <string name="sidebar_show">展开侧边栏</string>
+    <string name="sidebar_upgrade">升级</string>
+    <string name="sidebar_signin">登录</string>
+    <string name="sidebar_new">新建对话</string>
+    <string name="sidebar_settings">系统设置</string>
+    <string name="sidebar_api">API 服务</string>
+    <string name="sidebar_files">文件</string>
+    <string name="sidebar_group">交流群</string>
+    <string name="sidebar_feedback">反馈群</string>
+    <string name="sidebar_no_conv">暂无对话</string>
 
-    <string name="sidebar_hide">Hide sidebar</string>
-    <string name="sidebar_show">Show sidebar</string>
-    <string name="sidebar_upgrade">Upgrade</string>
-    <string name="sidebar_sign_in">Sign in</string>
+    <!-- Chat -->
+    <string name="chat_input_hint">输入消息…</string>
+    <string name="chat_send">发送</string>
+    <string name="chat_thinking">思考中…</string>
+    <string name="chat_error">出错了，请重试。</string>
+    <string name="chat_new">新对话</string>
+    <string name="chat_empty_title">开始对话</string>
+    <string name="chat_empty_desc">输入消息或点击下方建议开始</string>
+    <string name="chat_copy">复制</string>
+    <string name="chat_copied">已复制</string>
+    <string name="chat_typing">正在输入…</string>
 
-    <string name="subscribe_title">Subscribe</string>
-    <string name="subscribe_subtitle">Unlock more resource benefits</string>
+    <!-- Suggestions -->
+    <string name="suggest_web">网页设计</string>
+    <string name="suggest_script">脚本与旁白</string>
+    <string name="suggest_sales">销售数据分析</string>
+    <string name="suggest_news">每日新闻摘要</string>
 
-    <string name="chat_group_title">Chat group</string>
-    <string name="feedback_group_title">Subscription feedback group</string>
+    <!-- Tools -->
+    <string name="tool_channel">消息通道</string>
+    <string name="tool_skills">技能</string>
+    <string name="tool_wps">WPS 办公</string>
 
-    <string name="notice_title">Notice</string>
-    <string name="notice_desktop">For a better experience, please switch to a desktop browser</string>
-    <string name="notice_disclaimer">Developer demo platform for model showcases. Not a formal AI assistant. AI-generated content only.</string>
+    <!-- Settings -->
+    <string name="settings_title">系统设置</string>
+    <string name="settings_subscription">订阅</string>
+    <string name="settings_credits">算力用量</string>
+    <string name="settings_api_key">API Key</string>
+    <string name="settings_recovery">恢复</string>
+    <string name="settings_auto_repair">自动修复</string>
+    <string name="settings_restart">重启网关</string>
+    <string name="settings_reset">恢复默认</string>
+    <string name="settings_model">默认模型</string>
+    <string name="settings_theme">主题</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_logout">退出登录</string>
+    <string name="settings_logout_confirm">确定退出登录？</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_terms">服务协议</string>
+    <string name="settings_privacy">隐私政策</string>
+    <string name="settings_upgrade">升级</string>
+    <string name="settings_invoice">发票</string>
+    <string name="settings_reset_key">重置 Plan Key</string>
+    <string name="settings_details">详情</string>
+
+    <!-- Subscribe -->
+    <string name="subscribe_title">订阅</string>
+    <string name="subscribe_unlock">解锁更多权益</string>
+    <string name="subscribe_recommended">推荐</string>
+
+    <!-- API -->
+    <string name="api_title">API 服务</string>
+    <string name="api_generate">生成</string>
+    <string name="api_copy">复制</string>
+
+    <!-- Common -->
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="close">关闭</string>
+    <string name="back">返回</string>
+    <string name="loading">加载中…</string>
+    <string name="error_network">网络错误</string>
+
+    <!-- Disclaimer -->
+    <string name="disclaimer">开发者模型能力演示平台，非正式 AI 助手，内容由 AI 生成仅供参考。</string>
+    <string name="notice_title">提示</string>
+    <string name="notice_desktop">为获得更好体验，请使用桌面浏览器</string>
+    <string name="notice_gotit">知道了</string>
 </resources>
