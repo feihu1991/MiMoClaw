@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.xiaomi.mimoclaw.auth.AuthRepository
+import com.xiaomi.mimoclaw.core.update.UpdateChecker
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -75,5 +76,11 @@ object NetworkModule {
     @Singleton
     fun provideAuthRepository(retrofit: Retrofit): AuthRepository {
         return retrofit.create(AuthRepository::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUpdateChecker(gson: Gson): UpdateChecker {
+        return UpdateChecker(gson)
     }
 }

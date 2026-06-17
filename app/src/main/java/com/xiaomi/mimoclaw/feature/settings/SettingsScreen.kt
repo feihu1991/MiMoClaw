@@ -15,14 +15,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.xiaomi.mimoclaw.core.update.UpdateState
+import com.xiaomi.mimoclaw.core.update.UpdateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val updateState by updateViewModel.updateState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -111,6 +116,19 @@ fun SettingsScreen(
                     onClick = { }
                 )
                 SettingItem(
+                    icon = Icons.Outlined.SystemUpdate,
+                    title = "检查更新",
+                    subtitle = when (updateState) {
+                        is UpdateState.Checking -> "正在检查..."
+                        is UpdateState.UpToDate -> "已是最新版本"
+                        is UpdateState.Available -> "发现新版本"
+                        is UpdateState.Downloading -> "下载中..."
+                        is UpdateState.Error -> "检查失败，点击重试"
+                        else -> "手动检查新版本"
+                    },
+                    onClick = { updateViewModel.checkUpdate() }
+                )
+                SettingItem(
                     icon = Icons.Outlined.Description,
                     title = "服务协议",
                     onClick = { }
@@ -144,6 +162,16 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+
+    // ── 更新弹窗 (手动检查时) ──
+    val updateInfo by updateViewModel.updateInfo.collectAsState()
+    com.xiaomi.mimoclaw.core.update.UpdateDialog(
+        updateState = updateState,
+        updateInfo = updateInfo,
+        onUpdate = { updateViewModel.startDownload() },
+        onDismiss = { updateViewModel.dismissUpdate() },
+        onRetry = { updateViewModel.checkUpdate() }
+    )
 
     // ── 退出确认弹窗 ──
     if (showLogoutDialog) {
