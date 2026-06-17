@@ -26,7 +26,7 @@ class AuthManager @Inject constructor(
      */
     suspend fun login(username: String, password: String): Result<AuthInfo> = withContext(Dispatchers.IO) {
         try {
-            val response = authRepository.login(username, password)
+            val response = authRepository.login(LoginRequest(username, password))
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
@@ -65,7 +65,7 @@ class AuthManager @Inject constructor(
     suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
         try {
             val refreshToken = tokenManager.refreshToken ?: return@withContext false
-            val response = authRepository.refreshToken(refreshToken)
+            val response = authRepository.refreshToken(RefreshRequest(refreshToken))
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
