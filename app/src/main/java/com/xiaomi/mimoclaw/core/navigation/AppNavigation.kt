@@ -68,13 +68,11 @@ fun AppNavigation(
             )
         }
 
-        // ── Login ──
+        // ── Login (SSO) ──
         composable(Routes.LOGIN) {
             LoginScreen(
                 loginState = loginState,
-                onLogin = { username, password ->
-                    authViewModel.login(username, password)
-                },
+                onLoginSuccess = { authViewModel.onSsoLoginSuccess() },
                 onResetState = { authViewModel.resetState() }
             )
         }

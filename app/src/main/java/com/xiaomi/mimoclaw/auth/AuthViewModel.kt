@@ -36,15 +36,14 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun login(username: String, password: String) {
-        if (username.isBlank() || password.isBlank()) {
-            _loginState.value = LoginState.Error("请输入账号和密码")
-            return
-        }
-
+    /**
+     * SSO 登录成功后调用此方法
+     * 通过 Cookie 中的 SSO Token 获取用户信息
+     */
+    fun onSsoLoginSuccess() {
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
-            val result = authManager.login(username, password)
+            val result = authManager.fetchUserInfo()
             result.fold(
                 onSuccess = {
                     _loginState.value = LoginState.Success
@@ -55,6 +54,16 @@ class AuthViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    /**
+     * 保留旧的登录方法以兼容
+     * 实际应使用 SSO 流程
+     */
+    fun login(username: String, password: String) {
+        // 在 SSO 模式下，此方法不再直接使用
+        // 登录通过 SSO WebView 完成
+        _loginState.value = LoginState.Error("请使用小米账号登录")
     }
 
     fun logout() {

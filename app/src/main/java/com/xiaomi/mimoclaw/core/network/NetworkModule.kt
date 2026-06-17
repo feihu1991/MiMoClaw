@@ -1,12 +1,17 @@
 package com.xiaomi.mimoclaw.core.network
 
+import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.xiaomi.mimoclaw.auth.AuthRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -22,13 +27,33 @@ object NetworkModule {
     @Singleton
     fun provideGson(): Gson = GsonBuilder().setLenient().create()
 
+    /**
+     * 提供带 Cookie 管理的 OkHttpClient
+     *
+     * SSO 登录后，Cookie 中会包含认证信息。
+     * 与 Web 端保持一致，使用 Cookie 而非 Bearer Token。
+     */
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
+
+        val cookieStore = mutableMapOf<String, List<Cookie>>()
+
+        val cookieJar = object : CookieJar {
+            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                cookieStore[url.host] = cookies
+            }
+
+            override fun loadForRequest(url: HttpUrl): List<Cookie> {
+                return cookieStore[url.host] ?: emptyList()
+            }
+        }
+
         return OkHttpClient.Builder()
+            .cookieJar(cookieJar)
             .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)

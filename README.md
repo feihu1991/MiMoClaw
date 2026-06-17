@@ -71,9 +71,30 @@ app/src/main/java/com/xiaomi/mimoclaw/
 ./gradlew assembleDebug
 ```
 
+## API 接口
+
+详细接口文档参见 [API_DOC.md](./API_DOC.md)
+
+### 基础信息
+
+| 项目 | 值 |
+|------|-----|
+| Base URL | `https://aistudio.xiaomimimo.com` |
+| 认证方式 | 小米账号 SSO |
+
+### 主要接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/open-apis/user/mi/get` | GET | 获取用户信息 |
+| `/open-apis/bot/config` | GET | 获取 Bot 配置 |
+| `/open-apis/user/mimo-claw/channel-login/qrcode` | POST | 获取频道登录二维码 |
+| `/open-apis/user/mimo-claw/channel-login/status` | GET | 查询频道登录状态 |
+| `/open-apis/user/mimo-claw/channel/logout` | POST | 频道登出 |
+
 ## TODO
 
-- [ ] 接入小米账号 OAuth 登录
+- [x] 接入小米账号 SSO 登录
 - [ ] 接入 MiMo API 实际对话
 - [ ] 添加 Room 数据库持久化对话
 - [ ] 支持文件/图片附件上传

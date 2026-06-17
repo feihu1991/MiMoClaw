@@ -1,49 +1,53 @@
 package com.xiaomi.mimoclaw.auth
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.webkit.*
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 
+/**
+ * 登录界面
+ *
+ * 使用小米账号 SSO 登录，与 Web 端 (aistudio.xiaomimimo.com) 保持一致。
+ * 登录流程：
+ * 1. 打开小米账号 SSO 页面
+ * 2. 用户在 WebView 中完成登录
+ * 3. 登录成功后回调到 STS 接口
+ * 4. 检测到登录成功后获取用户信息
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginScreen(
     loginState: LoginState,
-    onLogin: (String, String) -> Unit,
+    onLoginSuccess: () -> Unit,
     onResetState: () -> Unit
 ) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var agreeTerms by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
+    var isLoading by remember { mutableStateState(false) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
 
-    // 清除错误状态
-    LaunchedEffect(username, password) {
-        if (loginState is LoginState.Error) onResetState()
+    // 监听登录成功
+    LaunchedEffect(loginState) {
+        if (loginState is LoginState.Success) {
+            onLoginSuccess()
+        }
     }
 
     Scaffold { padding ->
@@ -56,11 +60,10 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(80.dp))
+                Spacer(modifier = Modifier.height(60.dp))
 
                 // ── Logo ──
                 Box(
@@ -85,172 +88,132 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── 欢迎文字 ──
                 Text(
-                    "欢迎回来",
+                    "欢迎使用 MiMo Agent",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "登录 MiMo Agent 继续",
+                    "使用小米账号登录以继续",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(48.dp))
-
-                // ── 账号输入 ──
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("账号") },
-                    placeholder = { Text("邮箱 / 手机号 / 小米账号") },
-                    leadingIcon = { Icon(Icons.Outlined.Person, null) },
-                    shape = RoundedCornerShape(16.dp),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                    ),
-                    isError = loginState is LoginState.Error
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ── 密码输入 ──
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("密码") },
-                    placeholder = { Text("输入密码") },
-                    leadingIcon = { Icon(Icons.Outlined.Lock, null) },
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = null
-                            )
-                        }
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible) VisualTransformation.None
-                    else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            if (username.isNotBlank() && password.isNotBlank() && agreeTerms) {
-                                onLogin(username, password)
-                            }
-                        }
-                    ),
-                    isError = loginState is LoginState.Error
-                )
-
-                // ── 错误提示 ──
-                AnimatedVisibility(visible = loginState is LoginState.Error) {
-                    Text(
-                        text = (loginState as? LoginState.Error)?.message ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, start = 4.dp)
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ── 同意条款 ──
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = agreeTerms,
-                        onCheckedChange = { agreeTerms = it }
-                    )
-                    Text(
-                        "登录即表示同意 ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "服务协议",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        " 和 ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "隐私政策",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // ── 登录按钮 ──
-                Button(
-                    onClick = { onLogin(username, password) },
+                // ── SSO WebView ──
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .weight(1f),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = username.isNotBlank() && password.isNotBlank() && agreeTerms && loginState !is LoginState.Loading
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    AnimatedContent(
-                        targetState = loginState,
-                        label = "login_btn"
-                    ) { state ->
-                        when (state) {
-                            is LoginState.Loading -> {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.5.dp
-                                )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AndroidView(
+                            modifier = Modifier.fillMaxSize(),
+                            factory = { context ->
+                                WebView(context).apply {
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        setSupportZoom(true)
+                                        builtInZoomControls = true
+                                        displayZoomControls = false
+                                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                    }
+
+                                    // 同步 Cookie 到 OkHttp
+                                    CookieManager.getInstance().apply {
+                                        setAcceptCookie(true)
+                                        setAcceptThirdPartyCookies(this@apply, true)
+                                    }
+
+                                    webViewClient = object : WebViewClient() {
+                                        override fun onPageStarted(
+                                            view: WebView?,
+                                            pageUrl: String?,
+                                            favicon: Bitmap?
+                                        ) {
+                                            isLoading = true
+                                        }
+
+                                        override fun onPageFinished(
+                                            view: WebView?,
+                                            pageUrl: String?
+                                        ) {
+                                            isLoading = false
+
+                                            // 检测是否登录成功
+                                            // SSO 登录成功后会跳转到 aistudio.xiaomimimo.com
+                                            if (pageUrl != null &&
+                                                pageUrl.contains("aistudio.xiaomimimo.com") &&
+                                                !pageUrl.contains("account.xiaomi.com")
+                                            ) {
+                                                // 同步 Cookie 到 OkHttp
+                                                CookieManager.getInstance().flush()
+                                                onLoginSuccess()
+                                            }
+                                        }
+
+                                        override fun shouldOverrideUrlLoading(
+                                            view: WebView?,
+                                            request: WebResourceRequest?
+                                        ): Boolean {
+                                            return false
+                                        }
+                                    }
+
+                                    // 加载小米账号 SSO 页面
+                                    loadUrl(AuthRepository.SSO_LOGIN_URL)
+                                    webView = this
+                                }
                             }
-                            else -> {
-                                Text(
-                                    "登录",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 16.sp
-                                )
+                        )
+
+                        // 加载指示器
+                        if (isLoading) {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.TopCenter)
+                            )
+                        }
+
+                        // 错误提示
+                        if (loginState is LoginState.Error) {
+                            Snackbar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp),
+                                action = {
+                                    TextButton(onClick = onResetState) {
+                                        Text("重试")
+                                    }
+                                }
+                            ) {
+                                Text(loginState.message)
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // ── 底部提示 ──
                 Text(
-                    "登录即表示您同意我们的服务条款和隐私政策",
+                    "登录即表示您同意小米账号用户协议和隐私政策",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
-
-                Spacer(modifier = Modifier.height(48.dp))
             }
         }
     }

@@ -8,7 +8,9 @@ import javax.inject.Singleton
 
 /**
  * AuthManager - 认证管理
- * 负责: login / logout / token refresh / auth state
+ *
+ * 使用小米账号 SSO 登录，登录态通过 Cookie 维持。
+ * 与 Web 端 (aistudio.xiaomimimo.com) 保持一致。
  */
 @Singleton
 class AuthManager @Inject constructor(
@@ -22,37 +24,33 @@ class AuthManager @Inject constructor(
         get() = tokenManager.username
 
     /**
-     * 登录
+     * 通过 SSO Cookie 获取用户信息
+     * 调用 /open-apis/user/mi/get 验证登录态
      */
-    suspend fun login(username: String, password: String): Result<AuthInfo> = withContext(Dispatchers.IO) {
+    suspend fun fetchUserInfo(): Result<UserInfoData> = withContext(Dispatchers.IO) {
         try {
-            val response = authRepository.login(LoginRequest(username, password))
+            val response = authRepository.getUserInfo()
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null) {
+                if (body?.data != null) {
+                    val info = body.data
                     tokenManager.saveAuth(
-                        accessToken = body.accessToken,
-                        refreshToken = body.refreshToken,
-                        expiresAt = System.currentTimeMillis() + (body.expiresIn * 1000L),
-                        userId = body.userId,
-                        username = username
+                        accessToken = "sso_cookie",  // SSO 模式下 Token 存储在 Cookie 中
+                        refreshToken = null,
+                        expiresAt = System.currentTimeMillis() + (24 * 3600 * 1000L), // 24h
+                        userId = info.userId,
+                        username = info.nickname ?: info.userId
                     )
-                    Result.success(AuthInfo(
-                        userId = body.userId ?: "",
-                        username = username,
-                        accessToken = body.accessToken
-                    ))
+                    Result.success(info)
                 } else {
-                    Result.failure(Exception("登录响应为空"))
+                    Result.failure(Exception("用户信息为空"))
                 }
             } else {
-                val errorMsg = when (response.code()) {
-                    401 -> "账号或密码错误"
-                    403 -> "账号被锁定"
-                    429 -> "请求过于频繁，请稍后再试"
-                    else -> "登录失败 (${response.code()})"
+                when (response.code()) {
+                    401 -> Result.failure(Exception("未登录或登录已过期"))
+                    403 -> Result.failure(Exception("账号被锁定"))
+                    else -> Result.failure(Exception("获取用户信息失败 (${response.code()})"))
                 }
-                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(Exception("网络错误: ${e.message}"))
@@ -60,26 +58,12 @@ class AuthManager @Inject constructor(
     }
 
     /**
-     * 刷新Token
+     * 验证当前登录态是否有效
      */
-    suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun validateLogin(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val refreshToken = tokenManager.refreshToken ?: return@withContext false
-            val response = authRepository.refreshToken(RefreshRequest(refreshToken))
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null) {
-                    tokenManager.saveAuth(
-                        accessToken = body.accessToken,
-                        refreshToken = body.refreshToken ?: refreshToken,
-                        expiresAt = System.currentTimeMillis() + (body.expiresIn * 1000L),
-                        userId = tokenManager.userId,
-                        username = tokenManager.username
-                    )
-                    return@withContext true
-                }
-            }
-            false
+            val response = authRepository.getUserInfo()
+            response.isSuccessful && response.body()?.data != null
         } catch (e: Exception) {
             false
         }
@@ -93,14 +77,11 @@ class AuthManager @Inject constructor(
     }
 
     /**
-     * 检查并刷新Token
+     * 检查并验证登录态
      */
     suspend fun ensureValidToken(): Boolean {
         if (!isLoggedIn) return false
-        if (tokenManager.isTokenExpired()) {
-            return refreshToken()
-        }
-        return true
+        return validateLogin()
     }
 }
 
