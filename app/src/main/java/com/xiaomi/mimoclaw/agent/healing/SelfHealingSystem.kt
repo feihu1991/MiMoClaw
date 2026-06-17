@@ -258,7 +258,7 @@ class SelfHealingSystem @Inject constructor(
                 RepairResponse(
                     repairedStep = parsed.repairedStep?.let {
                         TaskStep(
-                            type = try { StepType.valueOf(it.type.uppercase()) } catch (_: Exception) { StepType.SCREENSHOT },
+                            type = try { StepType.valueOf((it.type ?: "SCREENSHOT").uppercase()) } catch (_: Exception) { StepType.SCREENSHOT },
                             selector = it.selector,
                             value = it.value,
                             description = it.description ?: ""
