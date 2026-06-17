@@ -52,16 +52,6 @@ interface AuthRepository {
 
     companion object {
         const val BASE_URL = "https://aistudio.xiaomimimo.com/"
-
-        /**
-         * 小米账号 SSO 登录地址
-         * 登录成功后会回调到 STS 接口签发 Token
-         */
-        const val SSO_LOGIN_URL =
-            "https://account.xiaomi.com/fe/service/login/password" +
-            "?sid=xiaomichatbot" +
-            "&callback=https%3A%2F%2Faistudio.xiaomimimo.com%2Fsts" +
-            "&_group=DEFAULT"
     }
 }
 
