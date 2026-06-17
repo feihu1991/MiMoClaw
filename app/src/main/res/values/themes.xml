@@ -3,10 +3,5 @@
     <style name="Theme.MiMoClaw" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
-
-    <style name="Theme.MiMoClaw.Splash" parent="Theme.MiMoClaw">
-        <item name="android:windowBackground">@color/md_theme_light_primary</item>
     </style>
 </resources>

@@ -8,33 +8,33 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
-import com.xiaomi.mimoclaw.agent.webcontroller.WebController
-import com.xiaomi.mimoclaw.ui.navigation.AgentNavGraph
-import com.xiaomi.mimoclaw.ui.theme.MiMoClawTheme
+import com.xiaomi.mimoclaw.auth.AuthViewModel
+import com.xiaomi.mimoclaw.core.navigation.AppNavigation
+import com.xiaomi.mimoclaw.core.theme.MiMoTheme
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
-    @Inject
-    lateinit var webController: WebController
-
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            MiMoClawTheme {
+            MiMoTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    AgentNavGraph(
+                    val authViewModel: AuthViewModel = hiltViewModel()
+
+                    AppNavigation(
                         navController = navController,
-                        webController = webController
+                        authViewModel = authViewModel
                     )
                 }
             }
