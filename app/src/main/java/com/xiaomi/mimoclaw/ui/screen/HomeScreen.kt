@@ -131,24 +131,24 @@ fun HomeScreen(
                                 onClick = { /* pause */ },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                            ) { Icon(Icons.Default.Pause, null); Spacer(4.dp); Text("暂停") }
+                            ) { Icon(Icons.Default.Pause, null); Spacer(Modifier.width(4.dp)); Text("暂停") }
                             Button(
                                 onClick = { /* cancel */ },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) { Icon(Icons.Default.Close, null); Spacer(4.dp); Text("取消") }
+                            ) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(4.dp)); Text("取消") }
                         }
                         TaskState.PAUSED -> {
                             Button(
                                 onClick = { /* resume */ },
                                 modifier = Modifier.weight(1f)
-                            ) { Icon(Icons.Default.PlayArrow, null); Spacer(4.dp); Text("继续") }
+                            ) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(4.dp)); Text("继续") }
                         }
                         TaskState.FAILED -> {
                             Button(
                                 onClick = { /* retry */ },
                                 modifier = Modifier.weight(1f)
-                            ) { Icon(Icons.Default.Refresh, null); Spacer(4.dp); Text("重试") }
+                            ) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text("重试") }
                         }
                         else -> {}
                     }

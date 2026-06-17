@@ -246,10 +246,15 @@ class WebController @Inject constructor() {
     // ── 内部方法 ──
 
     private suspend fun evaluateJs(js: String): String = suspendCancellableCoroutine { cont ->
-        webView?.evaluateJavascript(js) { result ->
+        val wv = webView
+        if (wv == null) {
+            if (cont.isActive) cont.resume("") {}
+            return@suspendCancellableCoroutine
+        }
+        wv.evaluateJavascript(js) { result ->
             val cleaned = result?.removeSurrounding("\"")?.replace("\\\"", "\"") ?: ""
             if (cont.isActive) cont.resume(cleaned) {}
-        } ?: if (cont.isActive) cont.resume("") {}
+        }
     }
 
     private suspend fun waitForPageLoad(webView: WebView, timeoutMs: Long) {
