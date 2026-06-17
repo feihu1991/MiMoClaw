@@ -95,9 +95,9 @@ fun BrowserScreen(
                     webController.attachWebView(this)
 
                     webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                        override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: android.graphics.Bitmap?) {
                             isLoading = true
-                            url?.let { this@BrowserScreen.url = it }
+                            pageUrl?.let { url = it }
                         }
                         override fun onPageFinished(view: WebView?, url: String?) {
                             isLoading = false

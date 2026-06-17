@@ -71,9 +71,15 @@ selector可以是CSS选择器，也可以是元素描述（如"登录按钮"、"
         emit(PlanResult.Planning)
 
         try {
+            val prompt = buildString {
+                append("用户指令: ${request.instruction}\n")
+                if (request.currentUrl != null) append("当前页面: ${request.currentUrl}\n")
+                if (request.previousError != null) append("上次错误: ${request.previousError}\n")
+            }
+
             val messages = listOf(
                 ApiMessage(role = "system", content = PLANNING_SYSTEM_PROMPT),
-                ApiMessage(role = "user", content = buildPlanningPrompt(request))
+                ApiMessage(role = "user", content = prompt)
             )
 
             val chatRequest = ChatRequest(
