@@ -11,6 +11,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +24,13 @@ class UpdateViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
     private val application: Application
 ) : ViewModel() {
+
+    companion object {
+        /** 下载轮询最大等待时间: 10 分钟 */
+        private const val DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000L
+        /** 轮询间隔 */
+        private const val POLL_INTERVAL_MS = 500L
+    }
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
@@ -73,52 +81,62 @@ class UpdateViewModel @Inject constructor(
                 val downloadManager =
                     application.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
+                val fileName = "mimo-agent-${info.tagName}.apk"
+
                 val request = DownloadManager.Request(Uri.parse(info.downloadUrl)).apply {
                     setTitle("MiMo Agent 更新")
-                    setDescription("正在下载 v${info.versionName}")
+                    setDescription("正在下载 ${info.versionName}")
                     setNotificationVisibility(
                         DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
                     )
                     setDestinationInExternalPublicDir(
                         Environment.DIRECTORY_DOWNLOADS,
-                        "mimo-agent-update.apk"
+                        fileName
                     )
                     setAllowedOverMetered(true)
                     setAllowedOverRoaming(true)
                 }
 
                 val downloadId = downloadManager.enqueue(request)
-
-                // 轮询下载进度
-                pollDownloadProgress(downloadManager, downloadId)
+                pollDownloadProgress(downloadManager, downloadId, fileName)
             } catch (e: Exception) {
                 _updateState.value = UpdateState.Error("下载失败: ${e.message}")
             }
         }
     }
 
-    /** 轮询下载进度 */
+    /**
+     * 轮询下载进度
+     * @param fileName APK 文件名，用于后续安装
+     */
     private suspend fun pollDownloadProgress(
         downloadManager: DownloadManager,
-        downloadId: Long
+        downloadId: Long,
+        fileName: String
     ) {
         val query = DownloadManager.Query().setFilterById(downloadId)
+        val startTime = System.currentTimeMillis()
 
         while (true) {
-            kotlinx.coroutines.delay(500)
+            delay(POLL_INTERVAL_MS)
+
+            // 超时保护
+            if (System.currentTimeMillis() - startTime > DOWNLOAD_TIMEOUT_MS) {
+                _updateState.value = UpdateState.Error("下载超时，请检查网络后重试")
+                return
+            }
 
             val cursor = downloadManager.query(query)
             if (cursor != null && cursor.moveToFirst()) {
-                val statusIdx =
-                    cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                val totalIdx =
-                    cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                val downloadedIdx =
-                    cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-
-                val status = cursor.getInt(statusIdx)
-                val total = cursor.getLong(totalIdx)
-                val downloaded = cursor.getLong(downloadedIdx)
+                val status = cursor.getInt(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
+                )
+                val total = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                )
+                val downloaded = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                )
                 cursor.close()
 
                 when (status) {
@@ -129,7 +147,7 @@ class UpdateViewModel @Inject constructor(
 
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         _updateState.value = UpdateState.Downloaded(downloadId)
-                        installApk(downloadId, downloadManager)
+                        installApk(fileName)
                         return
                     }
 
@@ -144,33 +162,34 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** 安装 APK */
-    private fun installApk(downloadId: Long, downloadManager: DownloadManager) {
-        val uri = downloadManager.getUriForDownloadedFile(downloadId) ?: return
+    /**
+     * 安装 APK
+     * 通过 FileProvider 生成 content:// URI，触发系统安装器
+     */
+    private fun installApk(fileName: String) {
+        try {
+            val file = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                fileName
+            )
 
-        // 对于 content:// URI，需要使用 FileProvider 或直接读取
-        val file = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "mimo-agent-update.apk"
-        )
+            if (!file.exists()) {
+                _updateState.value = UpdateState.Error("APK 文件不存在，请重新下载")
+                return
+            }
 
-        val apkUri = if (file.exists()) {
-            FileProvider.getUriForFile(
+            val apkUri = FileProvider.getUriForFile(
                 application,
                 "${application.packageName}.fileprovider",
                 file
             )
-        } else {
-            uri
-        }
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
 
-        try {
             application.startActivity(intent)
         } catch (e: Exception) {
             _updateState.value = UpdateState.Error("无法启动安装: ${e.message}")
@@ -183,7 +202,7 @@ class UpdateViewModel @Inject constructor(
         _updateState.value = UpdateState.Dismissed
     }
 
-    /** 获取当前版本号 */
+    /** 获取当前 versionCode (来自 build.gradle) */
     private fun getCurrentVersionCode(): Int {
         return try {
             val packageInfo = application.packageManager.getPackageInfo(

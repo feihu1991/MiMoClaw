@@ -21,8 +21,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * 登录界面 - 使用小米账号 SSO
+ *
+ * 注意: WebView.factory 只执行一次，闭包内的变量不会随重组更新。
+ * 因此使用 MutableState 直接引用 (Compose 自动追踪 State 读取)。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginScreen(
@@ -30,9 +32,9 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onResetState: () -> Unit
 ) {
-    var isLoading by remember { mutableStateOf(false) }
+    // 使用 MutableState 而非局部变量，确保 WebView 回调能触发重组
+    val isLoading = remember { mutableStateOf(false) }
 
-    // 监听登录成功
     LaunchedEffect(loginState) {
         if (loginState is LoginState.Success) {
             onLoginSuccess()
@@ -126,14 +128,15 @@ fun LoginScreen(
                                             pageUrl: String?,
                                             favicon: Bitmap?
                                         ) {
-                                            isLoading = true
+                                            isLoading.value = true
                                         }
 
                                         override fun onPageFinished(
                                             view: WebView?,
                                             pageUrl: String?
                                         ) {
-                                            isLoading = false
+                                            isLoading.value = false
+                                            // SSO 登录成功后会跳转回 aistudio
                                             if (pageUrl != null &&
                                                 pageUrl.contains("aistudio.xiaomimimo.com") &&
                                                 !pageUrl.contains("account.xiaomi.com")
@@ -154,7 +157,8 @@ fun LoginScreen(
                             }
                         )
 
-                        if (isLoading) {
+                        // 加载指示器 (读取 State 值，Compose 自动追踪)
+                        if (isLoading.value) {
                             LinearProgressIndicator(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -162,6 +166,7 @@ fun LoginScreen(
                             )
                         }
 
+                        // 错误提示
                         if (loginState is LoginState.Error) {
                             Snackbar(
                                 modifier = Modifier

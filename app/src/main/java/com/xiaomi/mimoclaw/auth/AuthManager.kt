@@ -85,8 +85,4 @@ class AuthManager @Inject constructor(
     }
 }
 
-data class AuthInfo(
-    val userId: String,
-    val username: String,
-    val accessToken: String
-)
+

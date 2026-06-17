@@ -14,8 +14,10 @@ import javax.inject.Singleton
  * GitHub Release 更新检测器
  *
  * 通过 GitHub API 检查最新 Release，比较版本号判断是否需要更新。
- * Release 格式要求: tag_name = "build-{runNumber}" 或 "v{version}"
- * APK 命名: app-debug.apk 或 app-release.apk
+ * 版本格式优先级: v{x}.{y}.{z} (语义版本) > build-{N} (CI 构建号)
+ *
+ * 对于 build-{N} 格式，仅当 remote > current 且差值 >= 1 时才提示更新，
+ * 避免 CI 频繁构建导致的误报。
  */
 @Singleton
 class UpdateChecker @Inject constructor(
@@ -37,7 +39,7 @@ class UpdateChecker @Inject constructor(
     /**
      * 检查是否有新版本
      *
-     * @param currentVersionCode 当前 app 的 versionCode
+     * @param currentVersionCode 当前 app 的 versionCode (来自 build.gradle)
      * @return UpdateInfo 如果有更新; null 如果已是最新
      */
     suspend fun checkForUpdate(currentVersionCode: Int): UpdateInfo? =
@@ -54,12 +56,12 @@ class UpdateChecker @Inject constructor(
                 val body = response.body?.string() ?: return@withContext null
                 val release = gson.fromJson(body, GitHubRelease::class.java)
 
-                // 解析版本号: 支持 "build-27" 或 "v3.0.0" 格式
-                val remoteVersionCode = extractVersionCode(release.tagName)
+                val remoteVersion = parseVersion(release.tagName)
                     ?: return@withContext null
 
-                if (remoteVersionCode <= currentVersionCode) {
-                    return@withContext null // 已是最新
+                // 同格式比较: 语义版本 vs 语义版本，CI 号 vs CI 号
+                if (!remoteVersion.shouldUpdate(currentVersionCode)) {
+                    return@withContext null
                 }
 
                 // 找到 APK 下载链接 (优先 release 包)
@@ -70,7 +72,7 @@ class UpdateChecker @Inject constructor(
                 }
 
                 UpdateInfo(
-                    versionCode = remoteVersionCode,
+                    versionCode = remoteVersion.code,
                     versionName = release.name ?: release.tagName,
                     releaseNotes = release.body ?: "无更新说明",
                     downloadUrl = apkAsset?.browserDownloadUrl ?: "",
@@ -84,28 +86,57 @@ class UpdateChecker @Inject constructor(
         }
 
     /**
-     * 从 tag 提取版本号
-     * "build-27" -> 27
-     * "v3.0.0" -> 基于 major*10000 + minor*100 + patch 计算
+     * 解析版本 tag，返回统一的版本信息
+     * 优先识别语义版本 (v3.0.0)，其次识别 CI 构建号 (build-27)
      */
-    private fun extractVersionCode(tag: String): Int? {
-        // 格式1: build-{number}
-        val buildMatch = Regex("build-(\\d+)").find(tag)
-        if (buildMatch != null) {
-            return buildMatch.groupValues[1].toIntOrNull()
+    private fun parseVersion(tag: String): ParsedVersion? {
+        // 优先: 语义版本 v{major}.{minor}.{patch}
+        val semver = Regex("v?(\\d+)\\.(\\d+)\\.(\\d+)").find(tag)
+        if (semver != null) {
+            val major = semver.groupValues[1].toIntOrNull() ?: return null
+            val minor = semver.groupValues[2].toIntOrNull() ?: return null
+            val patch = semver.groupValues[3].toIntOrNull() ?: return null
+            return ParsedVersion(
+                code = major * 10000 + minor * 100 + patch,
+                format = VersionFormat.SEMVER
+            )
         }
 
-        // 格式2: v{major}.{minor}.{patch}
-        val versionMatch = Regex("v?(\\d+)\\.(\\d+)\\.(\\d+)").find(tag)
-        if (versionMatch != null) {
-            val major = versionMatch.groupValues[1].toIntOrNull() ?: return null
-            val minor = versionMatch.groupValues[2].toIntOrNull() ?: return null
-            val patch = versionMatch.groupValues[3].toIntOrNull() ?: return null
-            return major * 10000 + minor * 100 + patch
+        // 备选: CI 构建号 build-{number}
+        val build = Regex("build-(\\d+)").find(tag)
+        if (build != null) {
+            val num = build.groupValues[1].toIntOrNull() ?: return null
+            return ParsedVersion(
+                code = num,
+                format = VersionFormat.BUILD_NUMBER
+            )
         }
 
         return null
     }
+}
+
+/** 解析后的版本信息 */
+private data class ParsedVersion(
+    val code: Int,
+    val format: VersionFormat
+) {
+    /**
+     * 判断是否应该更新
+     * - 语义版本: code > current 即可
+     * - CI 构建号: code > current 且差值 >= 2 (避免小版本迭代误报)
+     */
+    fun shouldUpdate(currentVersionCode: Int): Boolean {
+        return when (format) {
+            VersionFormat.SEMVER -> code > currentVersionCode
+            VersionFormat.BUILD_NUMBER -> code > currentVersionCode + 1
+        }
+    }
+}
+
+private enum class VersionFormat {
+    SEMVER,       // v3.0.0 → 30000
+    BUILD_NUMBER  // build-27 → 27
 }
 
 // ── 数据模型 ──
@@ -119,17 +150,14 @@ data class UpdateInfo(
     val publishedAt: String,
     val tagName: String
 ) {
-    /** 格式化文件大小 */
     fun formatSize(): String {
         if (apkSize <= 0) return "未知"
         val mb = apkSize / (1024.0 * 1024.0)
         return "%.1f MB".format(mb)
     }
 
-    /** 格式化发布时间 */
     fun formatPublishedAt(): String {
         return try {
-            // "2026-06-17T05:00:07Z" -> "2026-06-17"
             publishedAt.substring(0, 10)
         } catch (e: Exception) {
             publishedAt
@@ -137,7 +165,6 @@ data class UpdateInfo(
     }
 }
 
-/** GitHub API Release 响应 */
 data class GitHubRelease(
     @SerializedName("tag_name") val tagName: String,
     @SerializedName("name") val name: String?,
