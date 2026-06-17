@@ -40,7 +40,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onResetState: () -> Unit
 ) {
-    var isLoading by remember { mutableStateState(false) }
+    var isLoading by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
 
     // 监听登录成功
