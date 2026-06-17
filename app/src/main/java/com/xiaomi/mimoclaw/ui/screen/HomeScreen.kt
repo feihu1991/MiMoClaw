@@ -25,7 +25,10 @@ fun HomeScreen(
     onNavigateToConsole: () -> Unit,
     onNavigateToBrowser: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToDebug: () -> Unit = {}
+    onNavigateToDebug: () -> Unit = {},
+    onNavigateToQueue: () -> Unit = {},
+    onNavigateToMultiAgent: () -> Unit = {},
+    onNavigateToBilling: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -128,6 +131,41 @@ fun HomeScreen(
                         Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Debug")
+                    }
+                }
+
+                // 平台功能按钮
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onNavigateToQueue,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Queue, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("队列")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToMultiAgent,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Hub, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Agent")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToBilling,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Receipt, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("计费")
                     }
                 }
 
