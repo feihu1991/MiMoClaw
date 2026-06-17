@@ -4,118 +4,80 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.navArgument
-import com.xiaomi.mimoclaw.ui.MainViewModel
+import com.xiaomi.mimoclaw.agent.webcontroller.WebController
+import com.xiaomi.mimoclaw.ui.AgentViewModel
 import com.xiaomi.mimoclaw.ui.screen.*
 
 object Routes {
-    const val LOGIN = "login"
     const val HOME = "home"
-    const val CHAT = "chat/{mode}/{conversationId}"
+    const val TASK_DETAIL = "task_detail"
+    const val CONSOLE = "console"
+    const val BROWSER = "browser"
     const val SETTINGS = "settings"
-    const val SUBSCRIBE = "subscribe"
-    const val API_SERVICE = "api_service"
-
-    fun chat(mode: String, conversationId: String = "new") = "chat/$mode/$conversationId"
 }
 
 @Composable
-fun MiMoNavGraph(
+fun AgentNavGraph(
     navController: NavHostController,
-    viewModel: MainViewModel = hiltViewModel(),
+    webController: WebController,
+    viewModel: AgentViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
-    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
-
-    // 监听登录状态，自动跳转
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) {
-            navController.navigate(Routes.HOME) {
-                popUpTo(Routes.LOGIN) { inclusive = true }
-            }
-        }
-    }
+    val currentTask by viewModel.currentTask.collectAsState()
+    val logs by viewModel.logs.collectAsState()
+    val logText by viewModel.logText.collectAsState()
+    val inputText by viewModel.inputText.collectAsState()
 
     NavHost(
         navController = navController,
-        startDestination = Routes.LOGIN,
+        startDestination = Routes.HOME,
         modifier = modifier
     ) {
-        // ── 登录页 ──
-        composable(Routes.LOGIN) {
-            LoginScreen(
-                onLoginSuccess = { cookies ->
-                    viewModel.login(cookies, com.xiaomi.mimoclaw.data.model.User(
-                        userId = "web_user",
-                        nickname = "用户",
-                        avatar = null,
-                        email = null,
-                        phone = null
-                    ))
-                    // LaunchedEffect 会处理跳转
-                },
-                onBack = { }
-            )
-        }
-
-        // ── 首页 ──
         composable(Routes.HOME) {
-            MainScreen(
-                onNavigateToLogin = { navController.navigate(Routes.LOGIN) },
-                onNavigateToChat = { mode, convId ->
-                    navController.navigate(Routes.chat(mode.name, convId))
-                },
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToSubscribe = { navController.navigate(Routes.SUBSCRIBE) },
-                onNavigateToApiService = { navController.navigate(Routes.API_SERVICE) }
+            HomeScreen(
+                currentTask = currentTask,
+                inputText = inputText,
+                onInputChange = { viewModel.updateInput(it) },
+                onExecute = { viewModel.execute() },
+                onNavigateToDetail = { navController.navigate(Routes.TASK_DETAIL) },
+                onNavigateToConsole = { navController.navigate(Routes.CONSOLE) },
+                onNavigateToBrowser = { navController.navigate(Routes.BROWSER) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
             )
         }
 
-        // ── 聊天页 ──
-        composable(
-            route = Routes.CHAT,
-            arguments = listOf(
-                navArgument("mode") { type = NavType.StringType },
-                navArgument("conversationId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val mode = backStackEntry.arguments?.getString("mode") ?: "MIMO_CLAW"
-            val conversationId = backStackEntry.arguments?.getString("conversationId") ?: "new"
-            ChatScreenWrapper(
-                modeName = mode,
-                conversationId = conversationId,
-                onBack = { navController.popBackStack() },
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToSubscribe = { navController.navigate(Routes.SUBSCRIBE) },
-                onNavigateToApiService = { navController.navigate(Routes.API_SERVICE) },
-                onNavigateToLogin = { navController.navigate(Routes.LOGIN) }
+        composable(Routes.TASK_DETAIL) {
+            TaskDetailScreen(
+                task = currentTask,
+                onBack = { navController.popBackStack() }
             )
         }
 
-        // ── 设置页 ──
+        composable(Routes.CONSOLE) {
+            RunConsoleScreen(
+                task = currentTask,
+                logs = logs,
+                logText = logText,
+                onPause = { viewModel.pause() },
+                onResume = { viewModel.resume() },
+                onCancel = { viewModel.cancel() },
+                onRetry = { viewModel.retry() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.BROWSER) {
+            BrowserScreen(
+                webController = webController,
+                currentUrl = "",
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Routes.SETTINGS) {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onLogout = {
-                    viewModel.logout()
-                    navController.navigate(Routes.LOGIN) {
-                        popUpTo(Routes.HOME) { inclusive = true }
-                    }
-                }
-            )
-        }
-
-        // ── 订阅页 ──
-        composable(Routes.SUBSCRIBE) {
-            SubscribeScreen(onBack = { navController.popBackStack() })
-        }
-
-        // ── API 服务页 ──
-        composable(Routes.API_SERVICE) {
-            ApiServiceScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

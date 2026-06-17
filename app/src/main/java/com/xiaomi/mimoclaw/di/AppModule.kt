@@ -1,17 +1,15 @@
 package com.xiaomi.mimoclaw.di
 
 import android.content.Context
-import androidx.room.Room
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.xiaomi.mimoclaw.data.local.*
+import com.xiaomi.mimoclaw.data.local.PreferencesManager
 import com.xiaomi.mimoclaw.data.remote.MiMoApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -35,13 +33,6 @@ object AppModule {
         }
         return OkHttpClient.Builder()
             .addInterceptor(logging)
-            .addInterceptor(Interceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Accept", "text/event-stream")
-                    .build()
-                chain.proceed(request)
-            })
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -69,22 +60,4 @@ object AppModule {
     fun providePreferencesManager(@ApplicationContext context: Context): PreferencesManager {
         return PreferencesManager(context)
     }
-
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "mimo_claw.db"
-        ).build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideConversationDao(db: AppDatabase): ConversationDao = db.conversationDao()
-
-    @Provides
-    @Singleton
-    fun provideMessageDao(db: AppDatabase): MessageDao = db.messageDao()
 }

@@ -1,238 +1,268 @@
 package com.xiaomi.mimoclaw.ui.screen
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.xiaomi.mimoclaw.data.model.ChatMode
-import com.xiaomi.mimoclaw.ui.theme.MiMoGradientEnd
-import com.xiaomi.mimoclaw.ui.theme.MiMoGradientStart
+import com.xiaomi.mimoclaw.data.model.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onStartChat: (ChatMode) -> Unit,
-    onNavigateToSubscribe: () -> Unit,
-    onNavigateToLogin: () -> Unit,
-    isLoggedIn: Boolean = false
+    currentTask: AgentTask?,
+    inputText: String,
+    onInputChange: (String) -> Unit,
+    onExecute: () -> Unit,
+    onNavigateToDetail: () -> Unit,
+    onNavigateToConsole: () -> Unit,
+    onNavigateToBrowser: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        // ── Top bar ──
-        Surface(
-            tonalElevation = 1.dp,
-            shadowElevation = 2.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "MiMo Claw",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                if (!isLoggedIn) {
-                    FilledTonalButton(
-                        onClick = onNavigateToLogin,
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Text("登录")
-                    }
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Text(
-                            "Standard Annual",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("MiMo Agent", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, "设置")
                     }
                 }
-            }
+            )
         }
-
-        // ── Banner: 未登录提示 ──
-        if (!isLoggedIn) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "登录",
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            "登录解锁更多资源权益",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Button(
-                        onClick = onNavigateToLogin,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("登录")
-                    }
-                }
-            }
-        }
-
-        // ── 订阅入口 ──
-        Card(
+    ) { padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            onClick = onNavigateToSubscribe
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // ── 输入区 ──
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("⚡", fontSize = 24.sp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "TokenPlan",
+                        "告诉我要做什么",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        "灵活共享算力配额",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = onInputChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("例：打开百度搜索 MiMo Claw") },
+                        shape = RoundedCornerShape(12.dp),
+                        minLines = 2,
+                        maxLines = 5
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onExecute,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = inputText.isNotBlank()
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("执行任务")
+                    }
                 }
-                Icon(
-                    Icons.Default.ChevronRight,
-                    null,
-                    tint = MaterialTheme.colorScheme.outline
-                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // ── 核心功能 ──
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 一句话介绍
-            Text(
-                "你的个人助手：文档生成、资讯聚合、内容创作、开发提效、数据分析——解锁无限可能。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 22.sp
-            )
+            // ── 当前任务状态 ──
+            if (currentTask != null) {
+                Text("当前任务", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
 
+                TaskStatusCard(
+                    task = currentTask,
+                    onClick = onNavigateToDetail
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 快捷按钮
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onNavigateToConsole,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Terminal, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("控制台")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToBrowser,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Public, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("浏览器")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 执行控制
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    when (currentTask.state) {
+                        TaskState.RUNNING -> {
+                            Button(
+                                onClick = { /* pause */ },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) { Icon(Icons.Default.Pause, null); Spacer(4.dp); Text("暂停") }
+                            Button(
+                                onClick = { /* cancel */ },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) { Icon(Icons.Default.Close, null); Spacer(4.dp); Text("取消") }
+                        }
+                        TaskState.PAUSED -> {
+                            Button(
+                                onClick = { /* resume */ },
+                                modifier = Modifier.weight(1f)
+                            ) { Icon(Icons.Default.PlayArrow, null); Spacer(4.dp); Text("继续") }
+                        }
+                        TaskState.FAILED -> {
+                            Button(
+                                onClick = { /* retry */ },
+                                modifier = Modifier.weight(1f)
+                            ) { Icon(Icons.Default.Refresh, null); Spacer(4.dp); Text("重试") }
+                        }
+                        else -> {}
+                    }
+                }
+            } else {
+                // 空状态
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.SmartToy,
+                            null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "输入指令开始执行任务",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── 示例指令 ──
+            Text("示例指令", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // CTA 按钮
-            Button(
-                onClick = { onStartChat(ChatMode.MIMO_CLAW) },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("立即创建", fontWeight = FontWeight.SemiBold)
+            val examples = listOf(
+                "打开百度搜索 MiMo Claw",
+                "打开 github.com 并截图",
+                "打开百度，输入搜索内容并点击搜索按钮"
+            )
+            examples.forEach { example ->
+                OutlinedCard(
+                    onClick = { onInputChange(example) },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        example,
+                        modifier = Modifier.padding(14.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
-
-            OutlinedButton(
-                onClick = { onStartChat(ChatMode.MIMO_CHAT) },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("立即体验")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Feature cards - 简洁版
-            SimpleFeatureItem("🧠", "小米 MiMo 旗舰模型", "MiMo-V2.5-Pro 旗舰模型与 OpenClaw 原生深度适配")
-            SimpleFeatureItem("📄", "金山办公生态", "文档生成、在线预览、在线编辑，一站式办公闭环")
-            SimpleFeatureItem("⚡", "TokenPlan 算力保障", "创建即免费，灵活共享算力配额")
-            SimpleFeatureItem("☁️", "开箱即用，云端托管", "7×24h 云端托管，无需部署")
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // ── 底部声明 ──
-        Text(
-            "开发者模型能力演示平台，非正式 AI 助手，内容由 AI 生成仅供参考。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 16.dp)
-        )
     }
 }
 
 @Composable
-private fun SimpleFeatureItem(emoji: String, title: String, desc: String) {
+private fun TaskStatusCard(task: AgentTask, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        )
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Text(emoji, fontSize = 20.sp)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(task.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                TaskStateBadge(task.state)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 进度条
+            val completed = task.steps.count { it.state == StepState.SUCCESS }
+            LinearProgressIndicator(
+                progress = { if (task.steps.isEmpty()) 0f else completed.toFloat() / task.steps.size },
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "步骤 ${task.currentStepIndex + 1}/${task.steps.size} | $completed 完成",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            // 错误信息
+            if (task.error != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    task.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun TaskStateBadge(state: TaskState) {
+    val (color, text) = when (state) {
+        TaskState.IDLE -> MaterialTheme.colorScheme.outline to "待执行"
+        TaskState.RUNNING -> MaterialTheme.colorScheme.primary to "执行中"
+        TaskState.PAUSED -> MaterialTheme.colorScheme.secondary to "已暂停"
+        TaskState.FAILED -> MaterialTheme.colorScheme.error to "失败"
+        TaskState.SUCCESS -> MaterialTheme.colorScheme.tertiary to "完成"
+        TaskState.CANCELLED -> MaterialTheme.colorScheme.outline to "已取消"
+    }
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = color.copy(alpha = 0.15f)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+        )
     }
 }
