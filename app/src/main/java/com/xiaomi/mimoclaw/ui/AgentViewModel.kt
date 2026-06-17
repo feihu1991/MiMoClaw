@@ -2,8 +2,8 @@ package com.xiaomi.mimoclaw.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xiaomi.mimoclaw.agent.engine.AgentEngine
 import com.xiaomi.mimoclaw.agent.log.StructuredLogger
+import com.xiaomi.mimoclaw.agent.loop.AgentLoopEngine
 import com.xiaomi.mimoclaw.data.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -12,17 +12,26 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val engine: AgentEngine,
+    private val loopEngine: AgentLoopEngine,
     private val logger: StructuredLogger
 ) : ViewModel() {
 
-    val currentTask: StateFlow<AgentTask?> = engine.currentTask
-    val logs: StateFlow<List<AgentLog>> = engine.logs
+    // 核心状态
+    val currentTask: StateFlow<AgentTask?> = loopEngine.currentTask
+    val logs: StateFlow<List<AgentLog>> = loopEngine.logs
     val logText: StateFlow<String> = logger.logText
+
+    // Agent Loop 状态
+    val loopState: StateFlow<LoopState> = loopEngine.loopState
+    val observations: StateFlow<List<Observation>> = loopEngine.observations
+    val checkpoint: StateFlow<TaskCheckpoint?> = loopEngine.checkpoint
 
     // UI 状态
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
+
+    private val _showDebugPanel = MutableStateFlow(false)
+    val showDebugPanel: StateFlow<Boolean> = _showDebugPanel.asStateFlow()
 
     private val _showBrowser = MutableStateFlow(false)
     val showBrowser: StateFlow<Boolean> = _showBrowser.asStateFlow()
@@ -35,13 +44,17 @@ class AgentViewModel @Inject constructor(
         val input = _inputText.value.trim()
         if (input.isEmpty()) return
         _inputText.value = ""
-        engine.executeFromInstruction(input)
+        loopEngine.executeFromInstruction(input)
     }
 
-    fun pause() = engine.pause()
-    fun resume() = engine.resume()
-    fun cancel() = engine.cancel()
-    fun retry() = engine.retry()
+    fun pause() = loopEngine.pause()
+    fun resume() = loopEngine.resume()
+    fun cancel() = loopEngine.cancel()
+    fun retry() = loopEngine.retry()
+
+    fun toggleDebugPanel() {
+        _showDebugPanel.value = !_showDebugPanel.value
+    }
 
     fun toggleBrowser() {
         _showBrowser.value = !_showBrowser.value
@@ -53,6 +66,6 @@ class AgentViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        engine.destroy()
+        loopEngine.destroy()
     }
 }

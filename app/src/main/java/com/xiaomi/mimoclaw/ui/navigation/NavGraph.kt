@@ -16,6 +16,7 @@ object Routes {
     const val CONSOLE = "console"
     const val BROWSER = "browser"
     const val SETTINGS = "settings"
+    const val DEBUG_PANEL = "debug_panel"
 }
 
 @Composable
@@ -29,6 +30,9 @@ fun AgentNavGraph(
     val logs by viewModel.logs.collectAsState()
     val logText by viewModel.logText.collectAsState()
     val inputText by viewModel.inputText.collectAsState()
+    val loopState by viewModel.loopState.collectAsState()
+    val observations by viewModel.observations.collectAsState()
+    val checkpoint by viewModel.checkpoint.collectAsState()
 
     NavHost(
         navController = navController,
@@ -44,7 +48,8 @@ fun AgentNavGraph(
                 onNavigateToDetail = { navController.navigate(Routes.TASK_DETAIL) },
                 onNavigateToConsole = { navController.navigate(Routes.CONSOLE) },
                 onNavigateToBrowser = { navController.navigate(Routes.BROWSER) },
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToDebug = { navController.navigate(Routes.DEBUG_PANEL) }
             )
         }
 
@@ -78,6 +83,17 @@ fun AgentNavGraph(
 
         composable(Routes.SETTINGS) {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.DEBUG_PANEL) {
+            DebugPanelScreen(
+                task = currentTask,
+                loopState = loopState,
+                observations = observations,
+                checkpoint = checkpoint,
+                logs = logs,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

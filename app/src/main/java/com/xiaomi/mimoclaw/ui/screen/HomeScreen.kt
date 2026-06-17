@@ -24,13 +24,17 @@ fun HomeScreen(
     onNavigateToDetail: () -> Unit,
     onNavigateToConsole: () -> Unit,
     onNavigateToBrowser: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDebug: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("MiMo Agent", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = onNavigateToDebug) {
+                        Icon(Icons.Default.BugReport, "Debug")
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, "设置")
                     }
@@ -115,6 +119,15 @@ fun HomeScreen(
                         Icon(Icons.Default.Public, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("浏览器")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToDebug,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Debug")
                     }
                 }
 
