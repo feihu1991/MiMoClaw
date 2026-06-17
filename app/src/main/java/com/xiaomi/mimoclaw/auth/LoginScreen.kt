@@ -3,12 +3,9 @@ package com.xiaomi.mimoclaw.auth
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.webkit.*
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,14 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * 登录界面
- *
- * 使用小米账号 SSO 登录，与 Web 端 (aistudio.xiaomimimo.com) 保持一致。
- * 登录流程：
- * 1. 打开小米账号 SSO 页面
- * 2. 用户在 WebView 中完成登录
- * 3. 登录成功后回调到 STS 接口
- * 4. 检测到登录成功后获取用户信息
+ * 登录界面 - 使用小米账号 SSO
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -41,7 +31,6 @@ fun LoginScreen(
     onResetState: () -> Unit
 ) {
     var isLoading by remember { mutableStateOf(false) }
-    var webView by remember { mutableStateOf<WebView?>(null) }
 
     // 监听登录成功
     LaunchedEffect(loginState) {
@@ -90,7 +79,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ── 欢迎文字 ──
                 Text(
                     "欢迎使用 MiMo Agent",
                     style = MaterialTheme.typography.headlineLarge,
@@ -120,20 +108,17 @@ fun LoginScreen(
                             modifier = Modifier.fillMaxSize(),
                             factory = { context ->
                                 WebView(context).apply {
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        setSupportZoom(true)
-                                        builtInZoomControls = true
-                                        displayZoomControls = false
-                                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                    }
+                                    settings.javaScriptEnabled = true
+                                    settings.domStorageEnabled = true
+                                    settings.setSupportZoom(true)
+                                    settings.builtInZoomControls = true
+                                    settings.displayZoomControls = false
+                                    settings.mixedContentMode =
+                                        WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
-                                    // 同步 Cookie 到 OkHttp
-                                    CookieManager.getInstance().apply {
-                                        setAcceptCookie(true)
-                                        setAcceptThirdPartyCookies(this@apply, true)
-                                    }
+                                    CookieManager.getInstance().setAcceptCookie(true)
+                                    CookieManager.getInstance()
+                                        .setAcceptThirdPartyCookies(this, true)
 
                                     webViewClient = object : WebViewClient() {
                                         override fun onPageStarted(
@@ -149,14 +134,10 @@ fun LoginScreen(
                                             pageUrl: String?
                                         ) {
                                             isLoading = false
-
-                                            // 检测是否登录成功
-                                            // SSO 登录成功后会跳转到 aistudio.xiaomimimo.com
                                             if (pageUrl != null &&
                                                 pageUrl.contains("aistudio.xiaomimimo.com") &&
                                                 !pageUrl.contains("account.xiaomi.com")
                                             ) {
-                                                // 同步 Cookie 到 OkHttp
                                                 CookieManager.getInstance().flush()
                                                 onLoginSuccess()
                                             }
@@ -165,19 +146,14 @@ fun LoginScreen(
                                         override fun shouldOverrideUrlLoading(
                                             view: WebView?,
                                             request: WebResourceRequest?
-                                        ): Boolean {
-                                            return false
-                                        }
+                                        ): Boolean = false
                                     }
 
-                                    // 加载小米账号 SSO 页面
                                     loadUrl(AuthRepository.SSO_LOGIN_URL)
-                                    webView = this
                                 }
                             }
                         )
 
-                        // 加载指示器
                         if (isLoading) {
                             LinearProgressIndicator(
                                 modifier = Modifier
@@ -186,7 +162,6 @@ fun LoginScreen(
                             )
                         }
 
-                        // 错误提示
                         if (loginState is LoginState.Error) {
                             Snackbar(
                                 modifier = Modifier
@@ -206,7 +181,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ── 底部提示 ──
                 Text(
                     "登录即表示您同意小米账号用户协议和隐私政策",
                     style = MaterialTheme.typography.bodySmall,
