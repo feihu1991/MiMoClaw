@@ -1,6 +1,7 @@
 package com.xiaomi.mimoclaw.core.network
 
 import android.content.Context
+import android.webkit.CookieManager
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.xiaomi.mimoclaw.auth.AuthRepository
@@ -10,14 +11,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.Cookie
-import okhttp3.CookieJar
-import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -41,24 +40,40 @@ object NetworkModule {
             level = HttpLoggingInterceptor.Level.BASIC
         }
 
-        val cookieStore = mutableMapOf<String, List<Cookie>>()
-
-        val cookieJar = object : CookieJar {
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                cookieStore[url.host] = cookies
-            }
-
-            override fun loadForRequest(url: HttpUrl): List<Cookie> {
-                return cookieStore[url.host] ?: emptyList()
-            }
-        }
-
         return OkHttpClient.Builder()
-            .cookieJar(cookieJar)
+            .addInterceptor { chain ->
+                val url = chain.request().url.toString()
+                val cookieHeader = CookieManager.getInstance().getCookie(url)
+                val request = if (cookieHeader != null) {
+                    chain.request().newBuilder()
+                        .header("Cookie", cookieHeader)
+                        .build()
+                } else {
+                    chain.request()
+                }
+                chain.proceed(request)
+            }
             .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * 无 Cookie 的 OkHttpClient，供 GitHub API 等外部请求使用
+     */
+    @Provides
+    @Singleton
+    @Named("plain")
+    fun providePlainOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        }
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
             .build()
     }
 
@@ -80,7 +95,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideUpdateChecker(gson: Gson): UpdateChecker {
-        return UpdateChecker(gson)
+    fun provideUpdateChecker(@Named("plain") okHttpClient: OkHttpClient, gson: Gson): UpdateChecker {
+        return UpdateChecker(okHttpClient, gson)
     }
 }

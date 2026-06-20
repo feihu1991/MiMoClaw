@@ -20,6 +20,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
+ * 精确判断 Cookie 头中是否包含指定 name 的 cookie。
+ * Cookie 头格式: "k1=v1; k2=v2"
+ */
+private fun hasNamedCookie(cookieHeader: String, name: String): Boolean {
+    return cookieHeader.split("; ").any { piece ->
+        piece.trim().startsWith("$name=")
+    }
+}
+
+/**
  * 登录界面
  *
  * 直接加载 aistudio.xiaomimimo.com，用户点击页面上的 "Sign in"
@@ -35,6 +45,7 @@ fun LoginScreen(
 ) {
     val isLoading = remember { mutableStateOf(false) }
     val pageTitle = remember { mutableStateOf("") }
+    var hasGoneToSso by remember { mutableStateOf(false) }
 
     LaunchedEffect(loginState) {
         if (loginState is LoginState.Success) {
@@ -151,22 +162,34 @@ fun LoginScreen(
                                         isLoading.value = false
                                         pageTitle.value = view?.title ?: ""
 
-                                        // 登录成功检测:
-                                        // SSO 回调到 /sts 后会跳回 aistudio 域名
-                                        if (pageUrl != null &&
-                                            pageUrl.contains("aistudio.xiaomimimo.com") &&
-                                            !pageUrl.contains("account.xiaomi.com") &&
-                                            !pageUrl.contains("/sts")
-                                        ) {
+                                        if (pageUrl == null) return@onPageFinished
+
+                                        val onAistudio = pageUrl.contains("aistudio.xiaomimimo.com")
+                                        val onXiaomiAccount = pageUrl.contains("account.xiaomi.com")
+
+                                        if (onAistudio && !onXiaomiAccount && hasGoneToSso) {
+                                            // 仅在用户确实走过 SSO 后才检测登录态 cookie
+                                            val cookies = CookieManager.getInstance()
+                                                .getCookie("https://aistudio.xiaomimimo.com")
+                                            if (cookies != null && hasNamedCookie(cookies, "serviceToken")) {
+                                                CookieManager.getInstance().flush()
+                                                onLoginSuccess()
+                                            }
+                                        } else if (pageUrl.contains("/sts")) {
                                             CookieManager.getInstance().flush()
-                                            onLoginSuccess()
                                         }
                                     }
 
                                     override fun shouldOverrideUrlLoading(
                                         view: WebView?,
                                         request: WebResourceRequest?
-                                    ): Boolean = false
+                                    ): Boolean {
+                                        val reqUrl = request?.url?.toString() ?: ""
+                                        if (reqUrl.contains("account.xiaomi.com")) {
+                                            hasGoneToSso = true
+                                        }
+                                        return false
+                                    }
                                 }
 
                                 // 直接加载 aistudio，页面上的 Sign in 按钮

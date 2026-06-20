@@ -6,35 +6,32 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
  * GitHub Release 更新检测器
  *
  * 通过 GitHub API 检查最新 Release，比较版本号判断是否需要更新。
- * 版本格式优先级: v{x}.{y}.{z} (语义版本) > build-{N} (CI 构建号)
  *
- * 对于 build-{N} 格式，仅当 remote > current 且差值 >= 1 时才提示更新，
- * 避免 CI 频繁构建导致的误报。
+ * 版本 tag 格式:
+ * - v{x}.{y}.{z} (语义版本) — 仅用于展示 versionName，不触发更新提示。
+ * - build-{N} (CI 构建号) — N > currentVersionCode + 1 时才提示更新。
+ *
+ * 语义版本的派生 code（如 v3.0.0 → 30000）与 app 的 versionCode（如 3）不在同一口径，
+ * 因此语义版本不参与 shouldUpdate 判断，避免每次启动误报"发现新版本"。
  */
 @Singleton
 class UpdateChecker @Inject constructor(
+    @Named("plain") private val client: OkHttpClient,
     private val gson: Gson
 ) {
     companion object {
         private const val REPO = "feihu1991/MiMoClaw"
         private const val LATEST_URL =
             "https://api.github.com/repos/$REPO/releases/latest"
-        private const val CONNECT_TIMEOUT = 10L
-        private const val READ_TIMEOUT = 15L
     }
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
-        .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
-        .build()
 
     /**
      * 检查是否有新版本
@@ -59,7 +56,7 @@ class UpdateChecker @Inject constructor(
                 val remoteVersion = parseVersion(release.tagName)
                     ?: return@withContext null
 
-                // 同格式比较: 语义版本 vs 语义版本，CI 号 vs CI 号
+                // DISPLAY_ONLY (语义版本) 永远返回 false; BUILD_NUMBER 与 versionCode 比较
                 if (!remoteVersion.shouldUpdate(currentVersionCode)) {
                     return@withContext null
                 }
@@ -69,7 +66,7 @@ class UpdateChecker @Inject constructor(
                     it.name.contains("app-release.apk")
                 } ?: release.assets?.find {
                     it.name.endsWith(".apk")
-                }
+                } ?: return@withContext null
 
                 UpdateInfo(
                     versionCode = remoteVersion.code,
@@ -87,10 +84,13 @@ class UpdateChecker @Inject constructor(
 
     /**
      * 解析版本 tag，返回统一的版本信息
-     * 优先识别语义版本 (v3.0.0)，其次识别 CI 构建号 (build-27)
+     *
+     * - 语义版本 (v3.0.0) → format=DISPLAY_ONLY，code 派生为 major*10000 + minor*100 + patch，
+     *   仅用于展示与去重，不参与更新比较。
+     * - CI 构建号 (build-27) → format=BUILD_NUMBER，code 用于与 versionCode 比较。
      */
     private fun parseVersion(tag: String): ParsedVersion? {
-        // 优先: 语义版本 v{major}.{minor}.{patch}
+        // 语义版本 v{major}.{minor}.{patch} — 派生 code 仅用于展示与去重, 不触发更新比较
         val semver = Regex("v?(\\d+)\\.(\\d+)\\.(\\d+)").find(tag)
         if (semver != null) {
             val major = semver.groupValues[1].toIntOrNull() ?: return null
@@ -98,11 +98,11 @@ class UpdateChecker @Inject constructor(
             val patch = semver.groupValues[3].toIntOrNull() ?: return null
             return ParsedVersion(
                 code = major * 10000 + minor * 100 + patch,
-                format = VersionFormat.SEMVER
+                format = VersionFormat.DISPLAY_ONLY
             )
         }
 
-        // 备选: CI 构建号 build-{number}
+        // CI 构建号 build-{number}
         val build = Regex("build-(\\d+)").find(tag)
         if (build != null) {
             val num = build.groupValues[1].toIntOrNull() ?: return null
@@ -123,20 +123,20 @@ private data class ParsedVersion(
 ) {
     /**
      * 判断是否应该更新
-     * - 语义版本: code > current 即可
-     * - CI 构建号: code > current 且差值 >= 2 (避免小版本迭代误报)
+     * - DISPLAY_ONLY (语义版本): 不触发更新，code 仅用于展示
+     * - BUILD_NUMBER: code > currentVersionCode + 1 时提示更新
      */
     fun shouldUpdate(currentVersionCode: Int): Boolean {
         return when (format) {
-            VersionFormat.SEMVER -> code > currentVersionCode
+            VersionFormat.DISPLAY_ONLY -> false
             VersionFormat.BUILD_NUMBER -> code > currentVersionCode + 1
         }
     }
 }
 
 private enum class VersionFormat {
-    SEMVER,       // v3.0.0 → 30000
-    BUILD_NUMBER  // build-27 → 27
+    DISPLAY_ONLY,  // v3.0.0 → 展示用，不比较
+    BUILD_NUMBER   // build-27 → 27
 }
 
 // ── 数据模型 ──
