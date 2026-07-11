@@ -5,6 +5,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -57,7 +59,7 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = false,
                     onClick = onNavigateToTasks,
-                    icon = { Icon(Icons.Outlined.Assignment, null) },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.Assignment, null) },
                     label = { Text("任务") }
                 )
                 NavigationBarItem(
@@ -134,7 +136,7 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f)
                 )
                 QuickActionCard(
-                    icon = Icons.Default.Assignment,
+                    icon = Icons.AutoMirrored.Filled.Assignment,
                     title = "任务历史",
                     onClick = onNavigateToTasks,
                     modifier = Modifier.weight(1f)

@@ -7,21 +7,29 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.xiaomi.mimoclaw.auth.AuthViewModel
 import com.xiaomi.mimoclaw.auth.LoginScreen
 import com.xiaomi.mimoclaw.auth.LoginState
 import com.xiaomi.mimoclaw.auth.SplashScreen
-import com.xiaomi.mimoclaw.feature.browser.BrowserScreen
-import com.xiaomi.mimoclaw.feature.home.HomeScreen
+import com.xiaomi.mimoclaw.feature.chat.ChatScreen
+import com.xiaomi.mimoclaw.feature.chat.NativeChatScreen
 import com.xiaomi.mimoclaw.feature.settings.SettingsScreen
 import com.xiaomi.mimoclaw.feature.task.TaskScreen
+import com.xiaomi.mimoclaw.feature.browser.BrowserScreen
+import com.xiaomi.mimoclaw.feature.files.FileWorkspaceScreen
 
 object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
-    const val HOME = "home"
-    const val TASKS = "tasks"
-    const val BROWSER = "browser"
+    /** Default product entry: native MiMo Claw workspace. */
+    const val HOME = "claw"
+    /** Third entry: account, usage and developer console. */
+    const val TASKS = "console"
+    /** Second entry: official MiMo conversation workspace. */
+    const val BROWSER = "mimo_chat"
+    /** Native cloud file manager for the Claw workspace. */
+    const val FILES = "files"
     const val SETTINGS = "settings"
 }
 
@@ -34,6 +42,13 @@ fun AppNavigation(
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
     val loginState by authViewModel.loginState.collectAsState()
     val splashReady by authViewModel.splashReady.collectAsState()
+    val navigateTopLevel: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            launchSingleTop = true
+            popUpTo(Routes.HOME) { saveState = true }
+            restoreState = true
+        }
+    }
 
     // 登录成功后自动跳转首页
     LaunchedEffect(isLoggedIn) {
@@ -54,6 +69,7 @@ fun AppNavigation(
         // ── Splash ──
         composable(Routes.SPLASH) {
             SplashScreen(
+                isReady = splashReady,
                 onSplashFinished = {
                     if (isLoggedIn) {
                         navController.navigate(Routes.HOME) {
@@ -68,37 +84,56 @@ fun AppNavigation(
             )
         }
 
-        // ── Login (SSO) ──
+        // ── Login (小米官方 WebView) ──
         composable(Routes.LOGIN) {
             LoginScreen(
                 loginState = loginState,
-                onLoginSuccess = { authViewModel.onSsoLoginSuccess() },
-                onResetState = { authViewModel.resetState() }
+                onResetState = { authViewModel.resetState() },
+                onSsoSuccess = {
+                    authViewModel.onSsoLoginSuccess()
+                }
             )
         }
 
-        // ── Home (需要登录) ──
+        // ── Claw workspace (first entry; requires login) ──
         composable(Routes.HOME) {
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
-                HomeScreen(
-                    onNavigateToTasks = { navController.navigate(Routes.TASKS) },
-                    onNavigateToBrowser = { navController.navigate(Routes.BROWSER) },
+                ChatScreen(
+                    viewModel = hiltViewModel(),
+                    onNavigateToBrowser = { navigateTopLevel(Routes.BROWSER) },
+                    onNavigateToFiles = { navController.navigate(Routes.FILES) },
                     onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
                 )
             }
         }
 
-        // ── Tasks (需要登录) ──
+        // ── Console (third entry) ──
         composable(Routes.TASKS) {
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
-                TaskScreen(onBack = { navController.popBackStack() })
+                TaskScreen(
+                    onHome = { navigateTopLevel(Routes.HOME) },
+                    onBrowser = { navigateTopLevel(Routes.BROWSER) },
+                    onSettings = { navigateTopLevel(Routes.SETTINGS) },
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
 
-        // ── Browser (需要登录) ──
+        // ── MiMo Chat (second entry) ──
         composable(Routes.BROWSER) {
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
-                BrowserScreen(onBack = { navController.popBackStack() })
+                NativeChatScreen(
+                    viewModel = hiltViewModel(),
+                    onClaw = { navigateTopLevel(Routes.HOME) },
+                    onFiles = { navController.navigate(Routes.FILES) },
+                    onProfile = { navController.navigate(Routes.SETTINGS) }
+                )
+            }
+        }
+
+        composable(Routes.FILES) {
+            AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
+                FileWorkspaceScreen(onBack = { navController.popBackStack() })
             }
         }
 
@@ -106,6 +141,9 @@ fun AppNavigation(
         composable(Routes.SETTINGS) {
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
                 SettingsScreen(
+                    onHome = { navigateTopLevel(Routes.HOME) },
+                    onBrowser = { navigateTopLevel(Routes.BROWSER) },
+                    onFiles = { navController.navigate(Routes.FILES) },
                     onLogout = {
                         authViewModel.logout()
                         navController.navigate(Routes.LOGIN) {

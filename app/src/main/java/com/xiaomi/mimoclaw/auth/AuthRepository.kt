@@ -50,6 +50,15 @@ interface AuthRepository {
         @Query("channel") channel: String
     ): Response<Unit>
 
+    /**
+     * 获取 WebSocket 连接 ticket
+     * 需要在 Cookie 中携带认证信息
+     */
+    @GET("open-apis/user/ws/ticket")
+    suspend fun getWsTicket(
+        @Query("xiaomichatbot_ph") ph: String
+    ): Response<WsTicketResponse>
+
     companion object {
         const val BASE_URL = "https://aistudio.xiaomimimo.com/"
     }
@@ -88,4 +97,14 @@ data class ChannelLoginStatusResponse(
     val qrContent: String? = null,
     val qrVersion: Int = 0,
     val message: String? = null
+)
+
+data class WsTicketResponse(
+    val code: Int = 0,
+    val data: WsTicketData? = null,
+    val ticket: String? = null  // 兼容扁平结构
+)
+
+data class WsTicketData(
+    val ticket: String? = null
 )

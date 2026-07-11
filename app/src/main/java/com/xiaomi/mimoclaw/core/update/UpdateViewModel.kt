@@ -26,6 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
+    private val updatePrefs: UpdatePrefs,
     private val application: Application
 ) : ViewModel() {
 
@@ -33,7 +34,7 @@ class UpdateViewModel @Inject constructor(
         private const val TAG = "UpdateVM"
         private const val DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000L
         private const val POLL_INTERVAL_MS = 800L
-        private const val MAX_EMPTY_POLLS = 15  // 最多 12 秒无响应则判定失败
+        private const val MAX_EMPTY_POLLS = 15
     }
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -45,7 +46,10 @@ class UpdateViewModel @Inject constructor(
     private var dismissedVersionCode: Int = -1
 
     init {
-        checkUpdate()
+        viewModelScope.launch {
+            dismissedVersionCode = updatePrefs.getDismissedVersionCode()
+            checkUpdate()
+        }
     }
 
     fun checkUpdate() {
@@ -53,13 +57,23 @@ class UpdateViewModel @Inject constructor(
             _updateState.value = UpdateState.Checking
             try {
                 val currentVersionCode = getCurrentVersionCode()
-                val info = updateChecker.checkForUpdate(currentVersionCode)
-                if (info != null && info.versionCode != dismissedVersionCode) {
-                    _updateInfo.value = info
-                    _updateState.value = UpdateState.Available(info)
-                } else {
-                    _updateState.value = UpdateState.UpToDate
-                }
+                val result = updateChecker.checkForUpdate(
+                    currentVersionCode = currentVersionCode,
+                    currentVersionName = getCurrentVersionName()
+                )
+                result.fold(
+                    onSuccess = { info ->
+                        if (info != null && info.versionCode != dismissedVersionCode) {
+                            _updateInfo.value = info
+                            _updateState.value = UpdateState.Available(info)
+                        } else {
+                            _updateState.value = UpdateState.UpToDate
+                        }
+                    },
+                    onFailure = { error ->
+                        _updateState.value = UpdateState.Error(error.message ?: "检查更新失败")
+                    }
+                )
             } catch (e: Exception) {
                 _updateState.value = UpdateState.Error(e.message ?: "检查更新失败")
             }
@@ -72,6 +86,15 @@ class UpdateViewModel @Inject constructor(
             _updateState.value = UpdateState.Error("下载链接不可用")
             return
         }
+        val downloadUri = runCatching { Uri.parse(info.downloadUrl) }.getOrNull()
+        if (downloadUri?.scheme != "https" || downloadUri.host != "github.com") {
+            _updateState.value = UpdateState.Error("更新下载地址不可信")
+            return
+        }
+        if (info.sha256 == null) {
+            _updateState.value = UpdateState.Error("发布资产缺少 SHA-256，已拒绝下载")
+            return
+        }
 
         viewModelScope.launch {
             try {
@@ -81,27 +104,24 @@ class UpdateViewModel @Inject constructor(
                 val dm = application.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
                 // 清理旧文件
-                val fileName = "mimo-agent-${info.tagName}.apk"
-                val file = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    fileName
-                )
+                val safeTag = info.tagName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val fileName = "mimo-agent-$safeTag.apk"
+                val file = downloadFile(fileName)
                 if (file.exists()) file.delete()
 
-                val request = DownloadManager.Request(Uri.parse(info.downloadUrl)).apply {
+                val request = DownloadManager.Request(downloadUri).apply {
                     setTitle("MiMo Agent 更新")
                     setDescription("正在下载 ${info.versionName}")
                     setNotificationVisibility(
                         DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
                     )
-                    setDestinationInExternalPublicDir(
+                    setDestinationInExternalFilesDir(
+                        application,
                         Environment.DIRECTORY_DOWNLOADS,
                         fileName
                     )
                     setAllowedOverMetered(true)
                     setAllowedOverRoaming(true)
-                    // 允许 HTTP 重定向 (GitHub CDN)
-                    setAllowedOverMetered(true)
                 }
 
                 val downloadId = dm.enqueue(request)
@@ -114,7 +134,7 @@ class UpdateViewModel @Inject constructor(
 
                 // 切到 IO 线程轮询
                 withContext(Dispatchers.IO) {
-                    pollDownload(dm, downloadId, fileName)
+                    pollDownload(dm, downloadId, fileName, info.sha256)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "下载异常", e)
@@ -131,7 +151,8 @@ class UpdateViewModel @Inject constructor(
     private suspend fun pollDownload(
         dm: DownloadManager,
         downloadId: Long,
-        fileName: String
+        fileName: String,
+        expectedSha256: String
     ) {
         val query = DownloadManager.Query().setFilterById(downloadId)
         val startTime = System.currentTimeMillis()
@@ -143,6 +164,7 @@ class UpdateViewModel @Inject constructor(
             // 超时
             if (System.currentTimeMillis() - startTime > DOWNLOAD_TIMEOUT_MS) {
                 Log.w(TAG, "下载超时")
+                dm.remove(downloadId)
                 _updateState.value = UpdateState.Error("下载超时，请检查网络后重试")
                 return
             }
@@ -161,6 +183,7 @@ class UpdateViewModel @Inject constructor(
                 if (emptyPollCount >= MAX_EMPTY_POLLS) {
                     // 连续 15 次查不到 → 下载可能已失败或被系统清理
                     _updateState.value = UpdateState.Error("下载任务异常，请重试")
+                    dm.remove(downloadId)
                     return
                 }
                 continue
@@ -199,8 +222,17 @@ class UpdateViewModel @Inject constructor(
 
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     Log.d(TAG, "下载完成")
+                    val file = downloadFile(fileName)
+                    val verification = ApkVerifier.verify(application, file, expectedSha256)
+                    if (verification.isFailure) {
+                        file.delete()
+                        _updateState.value = UpdateState.Error(
+                            verification.exceptionOrNull()?.message ?: "APK 安全校验失败"
+                        )
+                        return
+                    }
                     _updateState.value = UpdateState.Downloaded(downloadId)
-                    installApk(fileName)
+                    installApk(file)
                     return
                 }
 
@@ -214,13 +246,8 @@ class UpdateViewModel @Inject constructor(
     }
 
     /** 安装 APK */
-    private fun installApk(fileName: String) {
+    private fun installApk(file: File) {
         try {
-            val file = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                fileName
-            )
-
             if (!file.exists()) {
                 Log.e(TAG, "APK 文件不存在: ${file.absolutePath}")
                 _updateState.value = UpdateState.Error("APK 文件不存在，请重新下载")
@@ -249,7 +276,11 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun dismissUpdate() {
-        dismissedVersionCode = _updateInfo.value?.versionCode ?: -1
+        val versionCode = _updateInfo.value?.versionCode ?: -1
+        dismissedVersionCode = versionCode
+        viewModelScope.launch {
+            updatePrefs.setDismissedVersionCode(versionCode)
+        }
         _updateState.value = UpdateState.Dismissed
     }
 
@@ -263,6 +294,20 @@ class UpdateViewModel @Inject constructor(
         } catch (e: PackageManager.NameNotFoundException) {
             0
         }
+    }
+
+    private fun getCurrentVersionName(): String {
+        return try {
+            application.packageManager.getPackageInfo(application.packageName, 0).versionName.orEmpty()
+        } catch (e: PackageManager.NameNotFoundException) {
+            ""
+        }
+    }
+
+    private fun downloadFile(fileName: String): File {
+        val directory = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: File(application.filesDir, "updates").apply { mkdirs() }
+        return File(directory, fileName)
     }
 }
 

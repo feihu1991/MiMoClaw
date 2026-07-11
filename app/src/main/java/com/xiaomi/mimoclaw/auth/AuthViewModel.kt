@@ -1,10 +1,13 @@
 package com.xiaomi.mimoclaw.auth
 
+import android.webkit.CookieManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -18,27 +21,37 @@ class AuthViewModel @Inject constructor(
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
-    private val _isLoggedIn = MutableStateFlow(authManager.isLoggedIn)
+    private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
     private val _splashReady = MutableStateFlow(false)
     val splashReady: StateFlow<Boolean> = _splashReady.asStateFlow()
 
     init {
-        // Splash: 检查登录状态
         viewModelScope.launch {
-            delay(800) // 最小显示时间
-            if (authManager.isLoggedIn) {
-                val valid = authManager.ensureValidToken()
-                _isLoggedIn.value = valid
+            delay(500)
+
+            // CookieManager 操作必须在主线程
+            val cookies = withContext(Dispatchers.Main) {
+                CookieManager.getInstance().getCookie("https://aistudio.xiaomimimo.com")
             }
+            if (cookies?.contains("serviceToken") == true && cookies.contains("xiaomichatbot_ph")) {
+                val valid = authManager.validateLogin()
+                if (valid) {
+                    _isLoggedIn.value = true
+                    _splashReady.value = true
+                    return@launch
+                }
+            }
+
+            // 需要登录 (WebView 输入账号密码)
+            _isLoggedIn.value = false
             _splashReady.value = true
         }
     }
 
     /**
-     * SSO 登录成功后调用此方法
-     * 通过 Cookie 中的 SSO Token 获取用户信息
+     * WebView 登录成功回调
      */
     fun onSsoLoginSuccess() {
         viewModelScope.launch {
@@ -49,21 +62,15 @@ class AuthViewModel @Inject constructor(
                     _loginState.value = LoginState.Success
                     _isLoggedIn.value = true
                 },
-                onFailure = { e ->
-                    _loginState.value = LoginState.Error(e.message ?: "登录失败")
+                onFailure = {
+                    val cookies = withContext(Dispatchers.Main) {
+                        CookieManager.getInstance().getCookie("https://aistudio.xiaomimimo.com")
+                    }
+                    _loginState.value = LoginState.Error(it.message ?: "登录验证失败")
+                    _isLoggedIn.value = false
                 }
             )
         }
-    }
-
-    /**
-     * 保留旧的登录方法以兼容
-     * 实际应使用 SSO 流程
-     */
-    fun login(username: String, password: String) {
-        // 在 SSO 模式下，此方法不再直接使用
-        // 登录通过 SSO WebView 完成
-        _loginState.value = LoginState.Error("请使用小米账号登录")
     }
 
     fun logout() {

@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,9 +20,11 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
+    isReady: Boolean,
     onSplashFinished: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
+    var minimumDurationDone by remember { mutableStateOf(false) }
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -42,7 +43,13 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         visible = true
         delay(1200)
+        minimumDurationDone = true
+    }
+
+    LaunchedEffect(isReady, minimumDurationDone) {
+        if (isReady && minimumDurationDone) {
         onSplashFinished()
+        }
     }
 
     Box(
@@ -62,14 +69,7 @@ fun SplashScreen(
                 modifier = Modifier
                     .size(100.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary
-                            )
-                        )
-                    ),
+                    .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

@@ -36,16 +36,15 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val authViewModel: AuthViewModel = hiltViewModel()
                     val updateViewModel: UpdateViewModel = hiltViewModel()
-
-                    // 更新弹窗
                     val updateState by updateViewModel.updateState.collectAsState()
                     val updateInfo by updateViewModel.updateInfo.collectAsState()
+
                     UpdateDialog(
                         updateState = updateState,
                         updateInfo = updateInfo,
-                        onUpdate = { updateViewModel.startDownload() },
-                        onDismiss = { updateViewModel.dismissUpdate() },
-                        onRetry = { updateViewModel.checkUpdate() }
+                        onUpdate = updateViewModel::startDownload,
+                        onDismiss = updateViewModel::dismissUpdate,
+                        onRetry = updateViewModel::checkUpdate
                     )
 
                     AppNavigation(

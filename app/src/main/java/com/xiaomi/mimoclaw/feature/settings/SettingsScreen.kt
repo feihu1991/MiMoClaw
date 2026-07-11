@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -18,11 +19,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.xiaomi.mimoclaw.core.update.UpdateState
 import com.xiaomi.mimoclaw.core.update.UpdateViewModel
+import com.xiaomi.mimoclaw.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
+    onHome: () -> Unit,
+    onBrowser: () -> Unit,
+    onFiles: () -> Unit,
     onBack: () -> Unit,
     updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
@@ -32,7 +37,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("设置", fontWeight = FontWeight.Bold) },
+                title = { Text("我的", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
@@ -42,14 +47,14 @@ fun SettingsScreen(
         },
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(selected = false, onClick = onBack,
-                    icon = { Icon(Icons.Default.Home, null) }, label = { Text("首页") })
-                NavigationBarItem(selected = false, onClick = { },
-                    icon = { Icon(Icons.Outlined.Assignment, null) }, label = { Text("任务") })
-                NavigationBarItem(selected = false, onClick = { },
-                    icon = { Icon(Icons.Outlined.Public, null) }, label = { Text("浏览") })
+                NavigationBarItem(selected = false, onClick = onHome,
+                    icon = { Icon(Icons.Default.Code, null) }, label = { Text("Claw") })
+                NavigationBarItem(selected = false, onClick = onBrowser,
+                    icon = { Icon(Icons.Outlined.Public, null) }, label = { Text("Chat") })
+                NavigationBarItem(selected = false, onClick = onFiles,
+                    icon = { Icon(Icons.Outlined.FolderOpen, null) }, label = { Text("文件") })
                 NavigationBarItem(selected = true, onClick = { },
-                    icon = { Icon(Icons.Filled.Settings, null) }, label = { Text("设置") })
+                    icon = { Icon(Icons.Filled.Person, null) }, label = { Text("我的") })
             }
         }
     ) { padding ->
@@ -65,78 +70,19 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Palette,
                     title = "主题",
                     subtitle = "跟随系统",
-                    onClick = { }
+                    onClick = null
                 )
                 SettingItem(
                     icon = Icons.Outlined.TextFields,
                     title = "字体大小",
                     subtitle = "默认",
-                    onClick = { }
-                )
-            }
-
-            // ── Agent ──
-            SectionHeader("Agent") {
-                SettingItem(
-                    icon = Icons.Outlined.SmartToy,
-                    title = "默认模型",
-                    subtitle = "MiMo-V2.5-Pro",
-                    onClick = { }
+                    onClick = null
                 )
                 SettingItem(
-                    icon = Icons.Outlined.Tune,
-                    title = "最大重试次数",
-                    subtitle = "3 次",
-                    onClick = { }
-                )
-            }
-
-            // ── 数据 ──
-            SectionHeader("数据") {
-                SettingItem(
-                    icon = Icons.Outlined.Storage,
-                    title = "缓存管理",
-                    subtitle = "清除缓存数据",
-                    onClick = { }
-                )
-                SettingItem(
-                    icon = Icons.Outlined.History,
-                    title = "任务历史",
-                    subtitle = "管理历史记录",
-                    onClick = { }
-                )
-            }
-
-            // ── 关于 ──
-            SectionHeader("关于") {
-                SettingItem(
-                    icon = Icons.Outlined.Info,
-                    title = "版本",
-                    subtitle = "3.0.0",
-                    onClick = { }
-                )
-                SettingItem(
-                    icon = Icons.Outlined.SystemUpdate,
-                    title = "检查更新",
-                    subtitle = when (updateState) {
-                        is UpdateState.Checking -> "正在检查..."
-                        is UpdateState.UpToDate -> "已是最新版本"
-                        is UpdateState.Available -> "发现新版本"
-                        is UpdateState.Downloading -> "下载中..."
-                        is UpdateState.Error -> "检查失败，点击重试"
-                        else -> "手动检查新版本"
-                    },
-                    onClick = { updateViewModel.checkUpdate() }
-                )
-                SettingItem(
-                    icon = Icons.Outlined.Description,
-                    title = "服务协议",
-                    onClick = { }
-                )
-                SettingItem(
-                    icon = Icons.Outlined.PrivacyTip,
-                    title = "隐私政策",
-                    onClick = { }
+                    icon = Icons.Outlined.Language,
+                    title = "语言",
+                    subtitle = "简体中文",
+                    onClick = null
                 )
             }
 
@@ -154,7 +100,7 @@ fun SettingsScreen(
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
             ) {
-                Icon(Icons.Outlined.Logout, null, modifier = Modifier.size(20.dp))
+                Icon(Icons.AutoMirrored.Outlined.Logout, null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("退出登录", fontWeight = FontWeight.SemiBold)
             }
@@ -177,7 +123,7 @@ fun SettingsScreen(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            icon = { Icon(Icons.Outlined.Logout, null) },
+            icon = { Icon(Icons.AutoMirrored.Outlined.Logout, null) },
             title = { Text("退出登录") },
             text = { Text("确定要退出登录吗？退出后需要重新登录才能使用。") },
             confirmButton = {
@@ -218,12 +164,12 @@ private fun SettingItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String? = null,
-    onClick: () -> Unit
+    onClick: (() -> Unit)?
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -235,6 +181,8 @@ private fun SettingItem(
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+        if (onClick != null) {
+            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+        }
     }
 }
