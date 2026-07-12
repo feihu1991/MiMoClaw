@@ -81,17 +81,7 @@ class LocalChatRepository @Inject constructor(
     }
 
     suspend fun updateMessage(messageId: String, content: String) {
-        // Room 没有直接的 update by id，需要先查再改
-        // 这里用一个简单的方式
-        val messages = chatDao.getMessagesList("").flatMap { emptyList<MessageEntity>() } // placeholder
-        // 实际实现需要用 DAO 的 query
-    }
-
-    suspend fun updateMessageContent(messageId: String, content: String) {
-        // 通过 DAO 直接更新
-        chatDao.insertMessage(
-            MessageEntity(id = messageId, conversationId = "", role = "", content = content)
-        )
+        chatDao.updateMessageContent(messageId, content)
     }
 
     suspend fun getMessageCount(conversationId: String): Int =
