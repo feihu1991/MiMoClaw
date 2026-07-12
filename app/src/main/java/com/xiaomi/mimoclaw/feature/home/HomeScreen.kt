@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onNavigateToChat: (String?) -> Unit,
     onNavigateToTasks: () -> Unit,
     onNavigateToBrowser: () -> Unit,
     onNavigateToSettings: () -> Unit
@@ -101,7 +102,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
-                        onClick = { },
+                        onClick = { onNavigateToChat(inputText) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         enabled = inputText.isNotBlank()
@@ -158,7 +159,7 @@ fun HomeScreen(
             )
             examples.forEach { example ->
                 OutlinedCard(
-                    onClick = { inputText = example },
+                    onClick = { onNavigateToChat(example) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),

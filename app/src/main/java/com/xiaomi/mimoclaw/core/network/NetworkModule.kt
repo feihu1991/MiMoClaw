@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.xiaomi.mimoclaw.auth.AuthRepository
+import com.xiaomi.mimoclaw.data.chat.ChatApi
 import com.xiaomi.mimoclaw.core.update.UpdateChecker
 import dagger.Module
 import dagger.Provides
@@ -76,6 +77,12 @@ object NetworkModule {
     @Singleton
     fun provideAuthRepository(retrofit: Retrofit): AuthRepository {
         return retrofit.create(AuthRepository::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatApi(retrofit: Retrofit): ChatApi {
+        return retrofit.create(ChatApi::class.java)
     }
 
     @Provides

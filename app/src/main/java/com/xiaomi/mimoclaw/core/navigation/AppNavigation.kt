@@ -5,8 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.xiaomi.mimoclaw.auth.AuthViewModel
 import com.xiaomi.mimoclaw.auth.LoginScreen
 import com.xiaomi.mimoclaw.auth.LoginState
@@ -15,11 +17,14 @@ import com.xiaomi.mimoclaw.feature.browser.BrowserScreen
 import com.xiaomi.mimoclaw.feature.home.HomeScreen
 import com.xiaomi.mimoclaw.feature.settings.SettingsScreen
 import com.xiaomi.mimoclaw.feature.task.TaskScreen
+import com.xiaomi.mimoclaw.ui.chat.ChatScreen
+import com.xiaomi.mimoclaw.ui.chat.ChatViewModel
 
 object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
     const val HOME = "home"
+    const val CHAT = "chat"
     const val TASKS = "tasks"
     const val BROWSER = "browser"
     const val SETTINGS = "settings"
@@ -81,9 +86,51 @@ fun AppNavigation(
         composable(Routes.HOME) {
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
                 HomeScreen(
+                    onNavigateToChat = { initialMessage ->
+                        val route = if (!initialMessage.isNullOrBlank()) {
+                            "${Routes.CHAT}?message=${java.net.URLEncoder.encode(initialMessage, "UTF-8")}"
+                        } else {
+                            Routes.CHAT
+                        }
+                        navController.navigate(route)
+                    },
                     onNavigateToTasks = { navController.navigate(Routes.TASKS) },
                     onNavigateToBrowser = { navController.navigate(Routes.BROWSER) },
                     onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                )
+            }
+        }
+
+        // ── Chat (需要登录) ──
+        composable(
+            route = "${Routes.CHAT}?message={message}",
+            arguments = listOf(
+                navArgument("message") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                    nullable = true
+                }
+            )
+        ) { backStackEntry ->
+            AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
+                val chatViewModel: ChatViewModel = hiltViewModel()
+                val chatUiState by chatViewModel.uiState.collectAsState()
+                val initialMessage = backStackEntry.arguments?.getString("message")
+
+                // 自动发送初始消息
+                LaunchedEffect(initialMessage) {
+                    if (!initialMessage.isNullOrBlank()) {
+                        val decoded = java.net.URLDecoder.decode(initialMessage, "UTF-8")
+                        chatViewModel.sendMessage(decoded)
+                    }
+                }
+
+                ChatScreen(
+                    uiState = chatUiState,
+                    onSendMessage = chatViewModel::sendMessage,
+                    onStopStreaming = chatViewModel::stopStreaming,
+                    onNewChat = chatViewModel::newChat,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }
