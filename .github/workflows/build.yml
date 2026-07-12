@@ -40,9 +40,15 @@ jobs:
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          VERSION_NAME: "3.0.${{ github.run_number }}"
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          VERSION_NAME: "3.0.${{ github.run_number }}"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -63,5 +69,5 @@ jobs:
           files: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
-          tag_name: build-${{ github.run_number }}
-          name: Build ${{ github.run_number }}
+          tag_name: v3.0.${{ github.run_number }}
+          name: v3.0.${{ github.run_number }}
