@@ -9,7 +9,12 @@ import com.xiaomi.mimoclaw.core.network.ContentBlock
 import com.xiaomi.mimoclaw.core.network.GatewayEvent
 import com.xiaomi.mimoclaw.core.network.SessionInfo
 import com.xiaomi.mimoclaw.feature.chat.model.ChatMessage
+import com.xiaomi.mimoclaw.feature.chat.model.DisplayItem
+import com.xiaomi.mimoclaw.feature.chat.model.ToolCall
 import com.xiaomi.mimoclaw.feature.chat.model.Conversation
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +43,25 @@ class ChatViewModel @Inject constructor(
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    // ── 折叠状态管理 ──
+    private val _collapsedGroups = MutableStateFlow<Set<String>>(emptySet())
+
+    // ── 显示项列表（将消息分组为可渲染的扁平列表）──
+    val displayItems: StateFlow<List<DisplayItem>> = combine(
+        _currentConversation,
+        _collapsedGroups
+    ) { conversation, _ ->
+        conversation?.messages.toDisplayItems()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun toggleGroup(groupId: String) {
+        _collapsedGroups.update { current ->
+            if (groupId in current) current - groupId else current + groupId
+        }
+    }
+
+    fun isGroupCollapsed(groupId: String): Boolean = groupId in _collapsedGroups.value
 
     private var streamingSessionKey: String? = null
     private var streamingMessageId: String? = null
@@ -90,6 +114,12 @@ class ChatViewModel @Inject constructor(
         streamingMessageId = assistant.id
         _isStreaming.value = true
 
+        // 新消息发送时自动折叠之前的工具组
+        _collapsedGroups.value = updated.messages
+            .filter { it.role == ChatMessage.Role.ASSISTANT && it.toolCalls.isNotEmpty() }
+            .map { "${it.id}_tools" }
+            .toSet()
+
         viewModelScope.launch(Dispatchers.IO) {
             gateway.sendChatMessage(
                 message = normalized,
@@ -123,6 +153,7 @@ class ChatViewModel @Inject constructor(
                 blocks = event.blocks,
                 isComplete = true
             )
+            is GatewayEvent.ToolEvent -> addToolEvent(event)
             is GatewayEvent.SessionList -> syncSessionsFromServer(event.sessions)
         }
     }
@@ -144,16 +175,19 @@ class ChatViewModel @Inject constructor(
         val oldMessage = conversation.messages[index]
         var thinking = if (isComplete) "" else oldMessage.thinkingContent
         var content = if (isComplete) "" else oldMessage.content
+        var tools = if (isComplete) emptyList() else oldMessage.toolCalls
         blocks.forEach { block ->
             when (block) {
                 is ContentBlock.Thinking -> thinking += block.text
                 is ContentBlock.Text -> content += block.text
+                is ContentBlock.Tool -> tools = mergeToolCall(tools, block.name, block.status)
             }
         }
 
         val newMessages = conversation.messages.toMutableList().apply {
             this[index] = oldMessage.copy(
                 thinkingContent = thinking,
+                toolCalls = tools,
                 content = content,
                 isStreaming = !isComplete
             )
@@ -161,6 +195,25 @@ class ChatViewModel @Inject constructor(
         upsertConversation(conversation.copy(messages = newMessages), makeCurrent = false)
 
         if (isComplete) clearStreamingState(targetSession, messageId)
+    }
+
+    private fun addToolEvent(event: GatewayEvent.ToolEvent) {
+        val sessionKey = event.sessionKey ?: streamingSessionKey ?: return
+        if (streamingSessionKey != null && sessionKey != streamingSessionKey) return
+        val conversation = findConversation(sessionKey) ?: return
+        val messageId = streamingMessageId ?: return
+        val index = conversation.messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return
+        val messages = conversation.messages.toMutableList()
+        val assistant = messages[index]
+        messages[index] = assistant.copy(toolCalls = mergeToolCall(assistant.toolCalls, event.name, event.status))
+        upsertConversation(conversation.copy(messages = messages), makeCurrent = false)
+    }
+
+    private fun mergeToolCall(current: List<ToolCall>, name: String, status: String): List<ToolCall> {
+        val index = current.indexOfLast { it.name == name }
+        return if (index < 0) current + ToolCall(name, status)
+        else current.toMutableList().apply { this[index] = ToolCall(name, status) }
     }
 
     private fun finishStreaming(sessionKey: String, messageId: String, errorMessage: String?) {
@@ -243,7 +296,9 @@ class ChatViewModel @Inject constructor(
                             "system" -> ChatMessage.Role.SYSTEM
                             else -> ChatMessage.Role.USER
                         },
-                        content = message.content
+                        content = message.content,
+                        thinkingContent = message.thinking,
+                        toolCalls = message.tools.map { ToolCall(it.name, it.status) }
                     )
                 }
                 val refreshed = conversation.copy(messages = messages)
@@ -275,4 +330,46 @@ class ChatViewModel @Inject constructor(
         const val TAG = "ChatVM"
         const val DEFAULT_MODEL = "mimo-v2.5-pro"
     }
+}
+
+/**
+ * 将消息列表转换为扁平的显示项列表
+ *
+ * 分组规则：
+ * - USER 消息 → UserMessage
+ * - ASSISTANT 消息 → ToolGroup（如有工具调用）+ ThinkingBlock（如有思考过程）+ AssistantMessage
+ * - SYSTEM 消息 → AssistantMessage
+ */
+private fun List<ChatMessage>?.toDisplayItems(): List<DisplayItem> {
+    if (this.isNullOrEmpty()) return emptyList()
+    val items = mutableListOf<DisplayItem>()
+    for (message in this) {
+        when (message.role) {
+            ChatMessage.Role.USER -> {
+                items.add(DisplayItem.UserMessage(message.id, message))
+            }
+            ChatMessage.Role.ASSISTANT -> {
+                if (message.toolCalls.isNotEmpty()) {
+                    items.add(DisplayItem.ToolGroup(
+                        id = "${message.id}_tools",
+                        tools = message.toolCalls,
+                        isRunning = message.isStreaming
+                    ))
+                }
+                if (message.thinkingContent.isNotBlank()) {
+                    items.add(DisplayItem.ThinkingBlock(
+                        id = "${message.id}_thinking",
+                        text = message.thinkingContent
+                    ))
+                }
+                if (message.content.isNotBlank() || message.isStreaming) {
+                    items.add(DisplayItem.AssistantMessage(message.id, message))
+                }
+            }
+            ChatMessage.Role.SYSTEM -> {
+                items.add(DisplayItem.AssistantMessage(message.id, message))
+            }
+        }
+    }
+    return items
 }

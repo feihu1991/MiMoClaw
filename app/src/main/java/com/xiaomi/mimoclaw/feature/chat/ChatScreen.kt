@@ -1,16 +1,8 @@
 package com.xiaomi.mimoclaw.feature.chat
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,42 +13,29 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Square
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,8 +54,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -84,6 +61,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,16 +73,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiaomi.mimoclaw.core.network.ConnectionState
 import com.xiaomi.mimoclaw.feature.chat.model.ChatMessage
 import com.xiaomi.mimoclaw.feature.chat.model.Conversation
+import com.xiaomi.mimoclaw.feature.chat.model.DisplayItem
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +97,7 @@ fun ChatScreen(
     val currentConversation by viewModel.currentConversation.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val displayItems by viewModel.displayItems.collectAsState()
     var inputText by remember { mutableStateOf("") }
 
     fun closeDrawerAnd(action: () -> Unit) {
@@ -168,7 +145,7 @@ fun ChatScreen(
             },
             bottomBar = {
                 Column {
-                    ComposerArea(
+                    ChatInputBar(
                         inputText = inputText,
                         onInputChange = { inputText = it },
                         onSend = {
@@ -189,11 +166,18 @@ fun ChatScreen(
                 }
             }
         ) { padding ->
-            ConversationContent(
-                messages = currentConversation?.messages.orEmpty(),
-                onSuggestionSelected = { inputText = it },
-                modifier = Modifier.padding(padding)
-            )
+            if (displayItems.isEmpty()) {
+                EmptyConversation(
+                    onSuggestionSelected = { inputText = it },
+                    modifier = Modifier.padding(padding)
+                )
+            } else {
+                ConversationContent(
+                    displayItems = displayItems,
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(padding)
+                )
+            }
         }
     }
 }
@@ -277,37 +261,97 @@ private fun StatusDot(state: ConnectionState) {
     )
 }
 
+/**
+ * 对话内容区域（使用 displayItems + reverseLayout）
+ */
 @Composable
 private fun ConversationContent(
-    messages: List<ChatMessage>,
-    onSuggestionSelected: (String) -> Unit,
+    displayItems: List<DisplayItem>,
+    viewModel: ChatViewModel,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-    val lastMessageLength = messages.lastOrNull()?.let {
-        it.content.length + it.thinkingContent.length
-    } ?: 0
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(messages.size, lastMessageLength) {
-        if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex)
+    // 自动滚动到底部（reverseLayout=true 时 index 0 是最新消息）
+    val lastItemLength = displayItems.lastOrNull()?.id?.length ?: 0
+    LaunchedEffect(displayItems.size, lastItemLength) {
+        if (displayItems.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
     }
 
-    if (messages.isEmpty()) {
-        EmptyConversation(
-            onSuggestionSelected = onSuggestionSelected,
-            modifier = modifier
+    // 滚动按钮显示条件
+    val showScrollButton by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 2 ||
+                (listState.firstVisibleItemIndex == 1 && listState.firstVisibleItemScrollOffset > 200)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // 消息列表（reverseLayout=true 实现 inverted 效果）
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            reverseLayout = true,
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(
+                items = displayItems,
+                key = { it.id }
+            ) { item ->
+                DisplayItemRow(item, viewModel)
+            }
+        }
+
+        // 滚动按钮
+        if (showScrollButton) {
+            Surface(
+                onClick = { scope.launch { listState.scrollToItem(0) } },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+                    .size(36.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 4.dp,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant
+                )
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.ArrowDownward,
+                        contentDescription = "回到底部",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 显示项渲染分发
+ */
+@Composable
+private fun DisplayItemRow(item: DisplayItem, viewModel: ChatViewModel) {
+    when (item) {
+        is DisplayItem.UserMessage -> UserBubble(item.message)
+        is DisplayItem.AssistantMessage -> AssistantBubble(item.message)
+        is DisplayItem.ToolGroup -> ToolGroupCard(
+            tools = item.tools,
+            isRunning = item.isRunning,
+            isCollapsed = viewModel.isGroupCollapsed(item.id),
+            onToggle = { viewModel.toggleGroup(item.id) }
         )
-        return
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(26.dp)
-    ) {
-        items(messages, key = { it.id }) { message ->
-            MessageRow(message)
+        is DisplayItem.ThinkingBlock -> {
+            // 思考块已经在 AssistantBubble 中处理，这里跳过
+            // 如果需要独立显示，可以添加 ThinkingBlockCard
         }
     }
 }
@@ -409,288 +453,6 @@ private fun SuggestionRow(suggestion: Suggestion, onClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.outline
             )
         }
-    }
-}
-
-@Composable
-private fun MessageRow(message: ChatMessage) {
-    when (message.role) {
-        ChatMessage.Role.USER -> UserMessage(message)
-        ChatMessage.Role.ASSISTANT -> AssistantMessage(message)
-        ChatMessage.Role.SYSTEM -> SystemMessage(message)
-    }
-}
-
-@Composable
-private fun UserMessage(message: ChatMessage) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
-    ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 312.dp),
-            shape = RoundedCornerShape(
-                topStart = 20.dp,
-                topEnd = 20.dp,
-                bottomStart = 20.dp,
-                bottomEnd = 6.dp
-            ),
-            color = MaterialTheme.colorScheme.surfaceVariant
-        ) {
-            SelectionContainer {
-                Text(
-                    text = message.content,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 24.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AssistantMessage(message: ChatMessage) {
-    var showThinking by remember(message.id) { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
-    ) {
-        Surface(
-            modifier = Modifier.size(30.dp),
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.inverseSurface
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    "M",
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .animateContentSize()
-        ) {
-            if (message.thinkingContent.isNotBlank()) {
-                TextButton(
-                    onClick = { showThinking = !showThinking },
-                    contentPadding = PaddingValues(0.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        if (showThinking) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp)
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        if (showThinking) "收起思考过程" else "查看思考过程",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                AnimatedVisibility(showThinking) {
-                    Row(
-                        modifier = Modifier.padding(bottom = 14.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Box(
-                            Modifier
-                                .width(2.dp)
-                                .height(48.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        SelectionContainer {
-                            Text(
-                                message.thinkingContent,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 20.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (message.isStreaming && message.content.isEmpty()) {
-                ThinkingIndicator()
-            } else {
-                SelectionContainer {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        lineHeight = 26.sp
-                    )
-                }
-            }
-
-            if (message.content.isNotBlank() && !message.isStreaming) {
-                Spacer(Modifier.height(7.dp))
-                IconButton(
-                    onClick = { copyMessage(context, message.content) },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = "复制回复",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThinkingIndicator() {
-    Row(
-        modifier = Modifier.height(28.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(16.dp),
-            strokeWidth = 1.6.dp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(9.dp))
-        Text(
-            "正在思考",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun SystemMessage(message: ChatMessage) {
-    Text(
-        text = message.content,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 30.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-@Composable
-private fun ComposerArea(
-    inputText: String,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onStop: () -> Unit,
-    isStreaming: Boolean,
-    model: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .imePadding()
-            .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant
-            ),
-            shadowElevation = 5.dp
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                TextField(
-                    value = inputText,
-                    onValueChange = onInputChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            "给 MiMo Claw 发消息",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 23.sp),
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = { if (inputText.isNotBlank() && !isStreaming) onSend() }
-                    ),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    )
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        prettyModelName(model),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Surface(
-                        onClick = if (isStreaming) onStop else onSend,
-                        enabled = isStreaming || inputText.isNotBlank(),
-                        modifier = Modifier.size(40.dp),
-                        shape = CircleShape,
-                        color = if (isStreaming) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else if (inputText.isNotBlank()) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isStreaming) Icons.Default.Square else Icons.AutoMirrored.Filled.Send,
-                                contentDescription = if (isStreaming) "停止生成" else "发送",
-                                modifier = Modifier.size(if (isStreaming) 15.dp else 18.dp),
-                                tint = if (isStreaming) {
-                                    MaterialTheme.colorScheme.surface
-                                } else if (inputText.isNotBlank()) {
-                                    MaterialTheme.colorScheme.onPrimary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(7.dp))
-        Text(
-            "AI 可能会出错，请核对重要信息",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
-        )
     }
 }
 
@@ -797,7 +559,7 @@ private fun ConversationDrawer(
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.navigationBarsPadding().height(8.dp))
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -858,30 +620,4 @@ private fun ConversationDrawerItem(
             )
         }
     }
-}
-
-@Composable
-private fun DrawerDestination(icon: ImageVector, label: String, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        label = { Text(label, style = MaterialTheme.typography.bodyMedium) },
-        selected = false,
-        onClick = onClick,
-        icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
-        modifier = Modifier.padding(horizontal = 10.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = NavigationDrawerItemDefaults.colors(
-            unselectedContainerColor = Color.Transparent
-        )
-    )
-}
-
-private fun prettyModelName(model: String): String = when (model.lowercase()) {
-    "mimo-v2.5-pro" -> "MiMo V2.5 Pro"
-    else -> model
-}
-
-private fun copyMessage(context: Context, content: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("MiMo Claw 回复", content))
-    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
 }

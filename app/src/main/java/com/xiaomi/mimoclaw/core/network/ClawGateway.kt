@@ -271,18 +271,48 @@ class ClawGateway @Inject constructor(
                 }
             }
             "agent" -> {
-                // AI agent 事件: data.delta 包含增量文本 (data.text 是完整文本, 仅用 delta)
-                val data = payload?.optJSONObject("data")
-                val delta = data?.optString("delta", "") ?: ""
-                val blocks = if (delta.isNotBlank()) listOf(ContentBlock.Text(delta)) else emptyList()
-                val eventSessionKey = extractEventSessionKey(payload)
-                scope.launch { _events.emit(GatewayEvent.AgentEvent(eventSessionKey, blocks)) }
+                // HAR 真实格式: 区分 stream 类型
+                val stream = payload?.optString("stream", "")
+                when (stream) {
+                    "lifecycle" -> {
+                        // 生命周期事件: phase="start"/"end"
+                        val phase = payload?.optJSONObject("data")?.optString("phase", "")
+                        debug { "agent lifecycle: $phase" }
+                    }
+                    "assistant" -> {
+                        // 助手文本增量: data.text=完整文本, data.delta=增量
+                        val data = payload?.optJSONObject("data")
+                        val delta = data?.optString("delta", "") ?: ""
+                        val blocks = if (delta.isNotBlank()) listOf(ContentBlock.Text(delta)) else emptyList()
+                        val eventSessionKey = extractEventSessionKey(payload)
+                        scope.launch { _events.emit(GatewayEvent.AgentEvent(eventSessionKey, blocks)) }
+                    }
+                    else -> {
+                        debug { "agent stream: $stream" }
+                    }
+                }
             }
             "chat" -> {
-                // 聊天文本块: deltaText 包含增量, message.content 包含完整块
-                val blocks = parseChatBlocks(payload)
-                val eventSessionKey = extractEventSessionKey(payload)
-                scope.launch { _events.emit(GatewayEvent.ChatEvent(eventSessionKey, blocks)) }
+                // HAR 真实格式: 区分 state 类型
+                val state = payload?.optString("state", "")
+                when (state) {
+                    "delta" -> {
+                        // 流式增量: deltaText=增量文本
+                        val deltaText = payload?.optString("deltaText", "") ?: ""
+                        val blocks = if (deltaText.isNotBlank()) listOf(ContentBlock.Text(deltaText)) else emptyList()
+                        val eventSessionKey = extractEventSessionKey(payload)
+                        scope.launch { _events.emit(GatewayEvent.ChatEvent(eventSessionKey, blocks)) }
+                    }
+                    "final" -> {
+                        // 最终消息: message 包含完整内容
+                        val blocks = parseChatBlocks(payload)
+                        val eventSessionKey = extractEventSessionKey(payload)
+                        scope.launch { _events.emit(GatewayEvent.ChatEvent(eventSessionKey, blocks)) }
+                    }
+                    else -> {
+                        debug { "chat state: $state" }
+                    }
+                }
             }
             "session.message" -> {
                 // session 消息: message.content 包含完整的 thinking + text 块
@@ -294,7 +324,16 @@ class ClawGateway @Inject constructor(
                 debug { "session.operation" }
             }
             "session.tool" -> {
-                debug { "session.tool" }
+                val eventSessionKey = extractEventSessionKey(payload)
+                val tool = payload?.optJSONObject("tool") ?: payload
+                val name = tool?.optString("name")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: tool?.optString("toolName")?.takeIf { it.isNotBlank() }
+                    ?: "工具调用"
+                val status = tool?.optString("status")?.takeIf { it.isNotBlank() }
+                    ?: tool?.optString("state")?.takeIf { it.isNotBlank() }
+                    ?: "执行中"
+                scope.launch { _events.emit(GatewayEvent.ToolEvent(eventSessionKey, name, status)) }
             }
             "sessions.changed" -> {
                 debug { "sessions.changed" }
@@ -367,6 +406,7 @@ class ClawGateway @Inject constructor(
                 when (block.optString("type", "")) {
                     "thinking" -> blocks.add(ContentBlock.Thinking(block.optString("thinking", "")))
                     "text" -> blocks.add(ContentBlock.Text(block.optString("text", "")))
+                    "tool" -> blocks.add(ContentBlock.Tool(block.optString("name", "工具调用"), block.optString("status", "执行中")))
                 }
             }
         }
@@ -500,14 +540,13 @@ class ClawGateway @Inject constructor(
         sessionKey: String = this.sessionKey
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
-        val idempotencyKey = "$requestId:user"
 
-        // chat.send 不传 model, 模型在 session 级别设置
-        // 模型切换需要 config.patch (需 baseHash), 当前仅 UI 切换生效
+        // HAR 真实格式: idempotencyKey 为纯 UUID, deliver 为 false
         val params = JSONObject().apply {
             put("sessionKey", sessionKey)
             put("message", message)
-            put("idempotencyKey", idempotencyKey)
+            put("deliver", false)
+            put("idempotencyKey", requestId)
         }
 
         debug { "发送 chat.send: session=$sessionKey model=$model" }
@@ -583,14 +622,20 @@ class ClawGateway @Inject constructor(
                 val msg = messages.getJSONObject(i)
                 val role = msg.optString("role", "user")
                 val content = msg.opt("content")
+                var thinking = ""
+                val tools = mutableListOf<HistoryToolCall>()
                 val contentStr = when (content) {
                     is org.json.JSONArray -> {
-                        // 提取 text 块
                         val parts = mutableListOf<String>()
                         for (j in 0 until content.length()) {
                             val block = content.getJSONObject(j)
-                            if (block.optString("type") == "text") {
-                                parts.add(block.optString("text", ""))
+                            when (block.optString("type")) {
+                                "text" -> parts.add(block.optString("text", ""))
+                                "thinking" -> thinking += block.optString("thinking", block.optString("text", ""))
+                                "tool", "tool_use", "toolUse" -> tools.add(HistoryToolCall(
+                                    name = block.optString("name", block.optString("toolName", "工具调用")),
+                                    status = block.optString("status", block.optString("state", "已完成"))
+                                ))
                             }
                         }
                         parts.joinToString("")
@@ -598,7 +643,7 @@ class ClawGateway @Inject constructor(
                     is String -> content
                     else -> content?.toString() ?: ""
                 }
-                list.add(HistoryMessage(role = role, content = contentStr))
+                list.add(HistoryMessage(role = role, content = contentStr, thinking = thinking, tools = tools))
             }
             list
         }
@@ -687,12 +732,14 @@ sealed class GatewayEvent {
     data class AgentEvent(val sessionKey: String?, val blocks: List<ContentBlock>) : GatewayEvent()
     data class ChatEvent(val sessionKey: String?, val blocks: List<ContentBlock>) : GatewayEvent()
     data class SessionMessage(val sessionKey: String?, val blocks: List<ContentBlock>) : GatewayEvent()
+    data class ToolEvent(val sessionKey: String?, val name: String, val status: String) : GatewayEvent()
     data class SessionList(val sessions: List<SessionInfo>) : GatewayEvent()
 }
 
 sealed class ContentBlock {
     data class Thinking(val text: String) : ContentBlock()
     data class Text(val text: String) : ContentBlock()
+    data class Tool(val name: String, val status: String) : ContentBlock()
 }
 
 data class SessionInfo(
@@ -705,5 +752,9 @@ data class SessionInfo(
 
 data class HistoryMessage(
     val role: String,
-    val content: String
+    val content: String,
+    val thinking: String = "",
+    val tools: List<HistoryToolCall> = emptyList()
 )
+
+data class HistoryToolCall(val name: String, val status: String)
