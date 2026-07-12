@@ -195,14 +195,21 @@ fun MessageBubble(message: UiMessage) {
             modifier = Modifier.widthIn(max = 300.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = message.content.ifEmpty { "..." },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser)
-                        MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (isUser) {
+                    // 用户消息：纯文本
+                    Text(
+                        text = message.content.ifEmpty { "..." },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    // AI 消息：Markdown 渲染
+                    MarkdownText(
+                        markdown = message.content.ifEmpty { "..." },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 // 流式输入指示器
                 if (message.isStreaming && message.content.isNotEmpty()) {
