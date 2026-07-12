@@ -1,10 +1,13 @@
 package com.xiaomi.mimoclaw.core.network
 
 import android.content.Context
+import androidx.room.Room
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.xiaomi.mimoclaw.auth.AuthRepository
 import com.xiaomi.mimoclaw.data.chat.ChatApi
+import com.xiaomi.mimoclaw.data.local.AppDatabase
+import com.xiaomi.mimoclaw.data.local.dao.ChatDao
 import com.xiaomi.mimoclaw.core.update.UpdateChecker
 import dagger.Module
 import dagger.Provides
@@ -83,6 +86,22 @@ object NetworkModule {
     @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi {
         return retrofit.create(ChatApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "mimo_claw_db"
+        ).build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatDao(database: AppDatabase): ChatDao {
+        return database.chatDao()
     }
 
     @Provides

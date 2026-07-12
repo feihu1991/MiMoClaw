@@ -2,6 +2,7 @@ package com.xiaomi.mimoclaw.ui.chat
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,20 +32,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiaomi.mimoclaw.data.chat.UiMessage
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     uiState: ChatUiState,
+    conversations: List<ConversationSummary>,
     onSendMessage: (String) -> Unit,
     onStopStreaming: () -> Unit,
     onNewChat: () -> Unit,
+    onLoadConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     // 自动滚动到底部
     LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
@@ -53,98 +60,255 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "MiMo 对话",
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        if (uiState.isStreaming) {
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ConversationDrawer(
+                conversations = conversations,
+                onConversationClick = { id ->
+                    onLoadConversation(id)
+                    coroutineScope.launch { drawerState.close() }
+                },
+                onNewChat = {
+                    onNewChat()
+                    coroutineScope.launch { drawerState.close() }
+                },
+                onDeleteConversation = onDeleteConversation,
+                onClose = { coroutineScope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
                             Text(
-                                "正在回复...",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                "MiMo 对话",
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleMedium
                             )
+                            if (uiState.isStreaming) {
+                                Text(
+                                    "正在回复...",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                    }
-                },
-                actions = {
-                    if (uiState.messages.isNotEmpty()) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        }
+                    },
+                    actions = {
+                        // 历史对话
+                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                            Icon(Icons.Outlined.History, "历史对话")
+                        }
+                        // 新对话
                         IconButton(onClick = onNewChat) {
                             Icon(Icons.Outlined.Add, "新对话")
                         }
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        bottomBar = {
-            ChatInputBar(
-                isStreaming = uiState.isStreaming,
-                onSendMessage = { text ->
-                    onSendMessage(text)
-                    keyboardController?.hide()
-                },
-                onStopStreaming = onStopStreaming
-            )
-        }
-    ) { padding ->
-        if (uiState.isEmpty) {
-            // 空状态 - 欢迎页
-            EmptyChatWelcome(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            )
-        } else {
-            // 消息列表
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(uiState.messages, key = { it.id }) { message ->
-                    MessageBubble(message = message)
-                }
-
-                // 底部间距
-                item { Spacer(modifier = Modifier.height(8.dp)) }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            },
+            bottomBar = {
+                ChatInputBar(
+                    isStreaming = uiState.isStreaming,
+                    onSendMessage = { text ->
+                        onSendMessage(text)
+                        keyboardController?.hide()
+                    },
+                    onStopStreaming = onStopStreaming
+                )
             }
-        }
-
-        // 错误提示
-        uiState.error?.let { error ->
-            Snackbar(
-                modifier = Modifier
-                    .padding(16.dp),
-                action = {
-                    TextButton(onClick = { /* clear error */ }) {
-                        Text("关闭")
+        ) { padding ->
+            if (uiState.isEmpty) {
+                EmptyChatWelcome(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    onSuggestionClick = onSendMessage
+                )
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(uiState.messages, key = { it.id }) { message ->
+                        MessageBubble(message = message)
                     }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
-            ) {
-                Text(error)
             }
         }
     }
 }
 
-/**
- * 消息气泡
- */
+// ── 对话历史抽屉 ──
+
+@Composable
+fun ConversationDrawer(
+    conversations: List<ConversationSummary>,
+    onConversationClick: (String) -> Unit,
+    onNewChat: () -> Unit,
+    onDeleteConversation: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.fillMaxWidth(0.85f)
+    ) {
+        // 标题
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "对话历史",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, "关闭")
+            }
+        }
+
+        HorizontalDivider()
+
+        // 新对话按钮
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Outlined.Add, null) },
+            label = { Text("新对话", fontWeight = FontWeight.Medium) },
+            selected = false,
+            onClick = onNewChat,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+
+        if (conversations.isEmpty()) {
+            // 空状态
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Outlined.ChatBubbleOutline,
+                        null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "暂无对话记录",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        } else {
+            // 对话列表
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(conversations, key = { it.id }) { conversation ->
+                    var showDeleteDialog by remember { mutableStateOf(false) }
+
+                    ConversationDrawerItem(
+                        conversation = conversation,
+                        onClick = { onConversationClick(conversation.id) },
+                        onLongClick = { showDeleteDialog = true }
+                    )
+
+                    if (showDeleteDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteDialog = false },
+                            title = { Text("删除对话") },
+                            text = { Text("确定要删除「${conversation.title}」吗？") },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showDeleteDialog = false
+                                        onDeleteConversation(conversation.id)
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) { Text("删除") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteDialog = false }) {
+                                    Text("取消")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 底部信息
+        HorizontalDivider()
+        Text(
+            "共 ${conversations.size} 条对话",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+@Composable
+fun ConversationDrawerItem(
+    conversation: ConversationSummary,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
+
+    NavigationDrawerItem(
+        icon = {
+            Icon(
+                Icons.Outlined.ChatBubbleOutline,
+                null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        label = {
+            Column {
+                Text(
+                    conversation.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    dateFormat.format(Date(conversation.updatedAt)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        },
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clickable(onClick = onClick)
+    )
+}
+
+// ── 消息气泡 ──
+
 @Composable
 fun MessageBubble(message: UiMessage) {
     val isUser = message.role == "user"
@@ -154,7 +318,6 @@ fun MessageBubble(message: UiMessage) {
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         if (!isUser) {
-            // AI 头像
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -179,7 +342,6 @@ fun MessageBubble(message: UiMessage) {
             Spacer(modifier = Modifier.width(8.dp))
         }
 
-        // 消息内容
         Surface(
             shape = RoundedCornerShape(
                 topStart = if (isUser) 16.dp else 4.dp,
@@ -196,14 +358,12 @@ fun MessageBubble(message: UiMessage) {
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (isUser) {
-                    // 用户消息：纯文本
                     Text(
                         text = message.content.ifEmpty { "..." },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    // AI 消息：Markdown 渲染
                     MarkdownText(
                         markdown = message.content.ifEmpty { "..." },
                         style = MaterialTheme.typography.bodyMedium,
@@ -211,7 +371,6 @@ fun MessageBubble(message: UiMessage) {
                     )
                 }
 
-                // 流式输入指示器
                 if (message.isStreaming && message.content.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     StreamingIndicator()
@@ -221,7 +380,6 @@ fun MessageBubble(message: UiMessage) {
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
-            // 用户头像
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -240,20 +398,17 @@ fun MessageBubble(message: UiMessage) {
     }
 }
 
-/**
- * 流式输入指示器（闪烁光标效果）
- */
+// ── 流式光标 ──
+
 @Composable
 fun StreamingIndicator() {
     var visible by remember { mutableStateOf(true) }
-
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(500)
             visible = !visible
         }
     }
-
     AnimatedVisibility(visible = visible) {
         Text(
             "▊",
@@ -263,9 +418,8 @@ fun StreamingIndicator() {
     }
 }
 
-/**
- * 输入栏
- */
+// ── 输入栏 ──
+
 @Composable
 fun ChatInputBar(
     isStreaming: Boolean,
@@ -286,7 +440,6 @@ fun ChatInputBar(
             verticalAlignment = Alignment.Bottom
         ) {
             if (isStreaming) {
-                // 停止按钮
                 FilledTonalButton(
                     onClick = onStopStreaming,
                     modifier = Modifier.fillMaxWidth(),
@@ -331,17 +484,18 @@ fun ChatInputBar(
     }
 }
 
-/**
- * 空对话欢迎页
- */
+// ── 欢迎页 ──
+
 @Composable
-fun EmptyChatWelcome(modifier: Modifier = Modifier) {
+fun EmptyChatWelcome(
+    modifier: Modifier = Modifier,
+    onSuggestionClick: (String) -> Unit = {}
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo
         Box(
             modifier = Modifier
                 .size(72.dp)
@@ -382,7 +536,6 @@ fun EmptyChatWelcome(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 示例问题
         val suggestions = listOf(
             "解释一下量子计算的基本原理",
             "帮我写一首关于春天的诗",
@@ -392,7 +545,7 @@ fun EmptyChatWelcome(modifier: Modifier = Modifier) {
 
         suggestions.forEach { suggestion ->
             OutlinedCard(
-                onClick = { /* TODO: 自动填入 */ },
+                onClick = { onSuggestionClick(suggestion) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp, vertical = 4.dp),

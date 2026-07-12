@@ -115,6 +115,7 @@ fun AppNavigation(
             AuthGuard(isLoggedIn = isLoggedIn, navController = navController) {
                 val chatViewModel: ChatViewModel = hiltViewModel()
                 val chatUiState by chatViewModel.uiState.collectAsState()
+                val conversations by chatViewModel.conversations.collectAsState()
                 val initialMessage = backStackEntry.arguments?.getString("message")
 
                 // 自动发送初始消息
@@ -127,9 +128,12 @@ fun AppNavigation(
 
                 ChatScreen(
                     uiState = chatUiState,
+                    conversations = conversations,
                     onSendMessage = chatViewModel::sendMessage,
                     onStopStreaming = chatViewModel::stopStreaming,
                     onNewChat = chatViewModel::newChat,
+                    onLoadConversation = chatViewModel::loadConversation,
+                    onDeleteConversation = chatViewModel::deleteConversation,
                     onBack = { navController.popBackStack() }
                 )
             }

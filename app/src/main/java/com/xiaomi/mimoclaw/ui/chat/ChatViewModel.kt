@@ -3,6 +3,7 @@ package com.xiaomi.mimoclaw.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaomi.mimoclaw.data.chat.*
+import com.xiaomi.mimoclaw.data.local.LocalChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -12,19 +13,32 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val localRepository: LocalChatRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    private val _conversations = MutableStateFlow<List<ConversationItem>>(emptyList())
-    val conversations: StateFlow<List<ConversationItem>> = _conversations.asStateFlow()
+    private val _conversations = MutableStateFlow<List<ConversationSummary>>(emptyList())
+    val conversations: StateFlow<List<ConversationSummary>> = _conversations.asStateFlow()
 
     private var streamJob: Job? = null
+    private var currentConversationId: String? = null
 
     init {
-        loadConversations()
+        // 观察本地对话列表
+        viewModelScope.launch {
+            localRepository.getAllConversations().collect { entities ->
+                _conversations.value = entities.map {
+                    ConversationSummary(
+                        id = it.id,
+                        title = it.title,
+                        updatedAt = it.updatedAt
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -33,27 +47,40 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(content: String) {
         if (content.isBlank() || _uiState.value.isStreaming) return
 
-        val userMessage = UiMessage(
-            id = UUID.randomUUID().toString(),
-            role = "user",
-            content = content.trim()
-        )
+        viewModelScope.launch {
+            // 如果没有当前对话，创建一个新的
+            if (currentConversationId == null) {
+                val title = content.trim().take(20).replace("\n", " ")
+                val id = localRepository.createConversation(title)
+                currentConversationId = id
+            }
 
-        // 添加用户消息
-        val currentMessages = _uiState.value.messages + userMessage
-        _uiState.update { it.copy(messages = currentMessages, isStreaming = true) }
+            val convId = currentConversationId!!
 
-        // 创建 assistant 消息占位
-        val assistantMessage = UiMessage(
-            id = UUID.randomUUID().toString(),
-            role = "assistant",
-            content = "",
-            isStreaming = true
-        )
-        _uiState.update { it.copy(messages = it.messages + assistantMessage) }
+            // 保存用户消息到本地
+            val userMsgId = localRepository.addMessage(convId, "user", content.trim())
 
-        // 发起流式请求
-        streamJob = viewModelScope.launch {
+            val userMessage = UiMessage(
+                id = userMsgId,
+                role = "user",
+                content = content.trim()
+            )
+
+            // 更新 UI
+            val currentMessages = _uiState.value.messages + userMessage
+            _uiState.update { it.copy(messages = currentMessages, isStreaming = true) }
+
+            // 创建 assistant 消息占位
+            val assistantMsgId = UUID.randomUUID().toString()
+            val assistantMessage = UiMessage(
+                id = assistantMsgId,
+                role = "assistant",
+                content = "",
+                isStreaming = true
+            )
+            _uiState.update { it.copy(messages = it.messages + assistantMessage) }
+
+            // 发起流式请求
             val apiMessages = currentMessages.map {
                 ChatMessage(role = it.role, content = it.content)
             }
@@ -70,16 +97,19 @@ class ChatViewModel @Inject constructor(
                         is StreamEvent.Done -> {
                             updateLastAssistantMessage(event.fullContent, isStreaming = false)
                             _uiState.update { it.copy(isStreaming = false) }
+                            // 保存 AI 回复到本地
+                            localRepository.addMessage(convId, "assistant", event.fullContent)
                         }
                         is StreamEvent.Error -> {
-                            updateLastAssistantMessage(
-                                content = if (fullContent.isEmpty()) "❌ ${event.message}"
-                                else fullContent.toString() + "\n\n❌ ${event.message}",
-                                isStreaming = false
-                            )
+                            val errorContent = if (fullContent.isEmpty()) "❌ ${event.message}"
+                            else fullContent.toString() + "\n\n❌ ${event.message}"
+                            updateLastAssistantMessage(errorContent, isStreaming = false)
                             _uiState.update { it.copy(isStreaming = false, error = event.message) }
+                            if (fullContent.isNotEmpty()) {
+                                localRepository.addMessage(convId, "assistant", fullContent.toString())
+                            }
                         }
-                        is StreamEvent.Debug -> { /* ignore in production */ }
+                        is StreamEvent.Debug -> { /* ignore */ }
                     }
                 }
         }
@@ -102,27 +132,32 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 清空当前对话
+     * 开始新对话
      */
-    fun clearChat() {
+    fun newChat() {
         streamJob?.cancel()
+        currentConversationId = null
         _uiState.update { ChatUiState() }
     }
 
     /**
-     * 开始新对话
+     * 加载历史对话
      */
-    fun newChat() {
-        clearChat()
-    }
-
-    /**
-     * 加载对话列表
-     */
-    fun loadConversations() {
+    fun loadConversation(conversationId: String) {
         viewModelScope.launch {
-            chatRepository.getConversations()
-                .onSuccess { _conversations.value = it }
+            currentConversationId = conversationId
+            val messages = localRepository.getMessagesList(conversationId)
+            _uiState.update {
+                it.copy(
+                    messages = messages.map { msg ->
+                        UiMessage(
+                            id = msg.id,
+                            role = msg.role,
+                            content = msg.content
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -131,21 +166,17 @@ class ChatViewModel @Inject constructor(
      */
     fun deleteConversation(conversationId: String) {
         viewModelScope.launch {
-            chatRepository.deleteConversation(conversationId)
-            loadConversations()
+            localRepository.deleteConversation(conversationId)
+            if (currentConversationId == conversationId) {
+                newChat()
+            }
         }
     }
 
-    /**
-     * 清除错误
-     */
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
 
-    /**
-     * 更新最后一条 assistant 消息
-     */
     private fun updateLastAssistantMessage(content: String, isStreaming: Boolean) {
         _uiState.update { state ->
             val messages = state.messages.toMutableList()
@@ -161,9 +192,6 @@ class ChatViewModel @Inject constructor(
     }
 }
 
-/**
- * Chat 页面 UI 状态
- */
 data class ChatUiState(
     val messages: List<UiMessage> = emptyList(),
     val isStreaming: Boolean = false,
@@ -172,3 +200,12 @@ data class ChatUiState(
     val isEmpty: Boolean get() = messages.isEmpty()
     val canSend: Boolean get() = !isStreaming
 }
+
+/**
+ * 对话摘要（用于列表展示）
+ */
+data class ConversationSummary(
+    val id: String,
+    val title: String,
+    val updatedAt: Long
+)
