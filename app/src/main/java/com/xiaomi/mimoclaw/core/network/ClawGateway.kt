@@ -125,8 +125,8 @@ class ClawGateway @Inject constructor(
                 return@withContext Result.failure(Exception("未登录, 请先在登录页完成小米账号认证"))
             }
 
-            // 先尝试通过 Retrofit (带 Cookie interceptor)
-            val response = authRepository.getWsTicket(ph)
+            // 先尝试通过 Retrofit (带 Cookie interceptor，ph 已在 Cookie 中)
+            val response = authRepository.getWsTicket()
             if (response.isSuccessful) {
                 val body = response.body()
                 // 兼容两种结构: { data: { ticket: "..." } } 或 { ticket: "..." }
@@ -137,8 +137,8 @@ class ClawGateway @Inject constructor(
             }
             Log.w(TAG, "Retrofit 获取 ticket 失败: HTTP ${response.code()}")
 
-            // Fallback: 原生 OkHttp 请求
-            val url = "$REST_BASE/open-apis/user/ws/ticket?xiaomichatbot_ph=$ph"
+            // Fallback: 原生 OkHttp 请求（ph 通过 Cookie 传输，不暴露在 URL 中）
+            val url = "$REST_BASE/open-apis/user/ws/ticket"
             val req = Request.Builder().url(url).get()
                 .header("Cookie", cookies)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) Chrome/137.0.0.0 Mobile Safari/537.36")

@@ -52,12 +52,10 @@ interface AuthRepository {
 
     /**
      * 获取 WebSocket 连接 ticket
-     * 需要在 Cookie 中携带认证信息
+     * 认证信息通过 Cookie 传输
      */
     @GET("open-apis/user/ws/ticket")
-    suspend fun getWsTicket(
-        @Query("xiaomichatbot_ph") ph: String
-    ): Response<WsTicketResponse>
+    suspend fun getWsTicket(): Response<WsTicketResponse>
 
     companion object {
         const val BASE_URL = "https://aistudio.xiaomimimo.com/"
