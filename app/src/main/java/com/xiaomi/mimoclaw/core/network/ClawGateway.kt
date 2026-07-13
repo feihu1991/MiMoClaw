@@ -59,6 +59,7 @@ class ClawGateway @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() +
         CoroutineExceptionHandler { _, throwable ->
             Log.e(TAG, "Coroutine 未捕获异常", throwable)
+            scope.launch { _events.emit(GatewayEvent.Error(throwable.message ?: "未知错误")) }
         })
 
     private fun debug(message: () -> String) {
@@ -733,6 +734,7 @@ sealed class GatewayEvent {
     data class SessionMessage(val sessionKey: String?, val blocks: List<ContentBlock>) : GatewayEvent()
     data class ToolEvent(val sessionKey: String?, val name: String, val status: String) : GatewayEvent()
     data class SessionList(val sessions: List<SessionInfo>) : GatewayEvent()
+    data class Error(val message: String) : GatewayEvent()
 }
 
 sealed class ContentBlock {

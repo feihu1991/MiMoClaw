@@ -164,6 +164,12 @@ class ChatViewModel @Inject constructor(
             )
             is GatewayEvent.ToolEvent -> addToolEvent(event)
             is GatewayEvent.SessionList -> syncSessionsFromServer(event.sessions)
+            is GatewayEvent.Error -> {
+                Log.e(TAG, "Gateway 错误: ${event.message}")
+                val sessionKey = streamingSessionKey ?: return
+                val messageId = streamingMessageId ?: return
+                finishStreaming(sessionKey, messageId, "错误: ${event.message}")
+            }
         }
     }
 
