@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaomi.mimoclaw.core.network.ClawGateway
 import com.xiaomi.mimoclaw.core.network.ConnectionState
+import com.xiaomi.mimoclaw.core.storage.ConversationStore
 import com.xiaomi.mimoclaw.core.network.ContentBlock
 import com.xiaomi.mimoclaw.core.network.GatewayEvent
 import com.xiaomi.mimoclaw.core.network.SessionInfo
@@ -26,7 +27,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val gateway: ClawGateway
+    private val gateway: ClawGateway,
+    private val conversationStore: ConversationStore
 ) : ViewModel() {
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -67,6 +69,13 @@ class ChatViewModel @Inject constructor(
     private var streamingMessageId: String? = null
 
     init {
+        // 加载持久化的对话
+        viewModelScope.launch(Dispatchers.IO) {
+            val saved = conversationStore.load()
+            if (saved.isNotEmpty()) {
+                _conversations.value = saved
+            }
+        }
         viewModelScope.launch {
             gateway.events.collect(::handleGatewayEvent)
         }
@@ -261,6 +270,7 @@ class ChatViewModel @Inject constructor(
         if (makeCurrent || _currentConversation.value?.id == conversation.id) {
             _currentConversation.value = conversation
         }
+        persistConversations()
     }
 
     private fun syncSessionsFromServer(sessions: List<SessionInfo>) {
@@ -312,6 +322,7 @@ class ChatViewModel @Inject constructor(
         _conversations.update { list -> list.filterNot { it.id == conversation.id } }
         if (_currentConversation.value?.id == conversation.id) _currentConversation.value = null
         if (streamingSessionKey == conversation.sessionKey) abortChat()
+        persistConversations()
     }
 
     fun setModel(model: String) {
@@ -323,6 +334,12 @@ class ChatViewModel @Inject constructor(
             val sessionKey = _currentConversation.value?.sessionKey ?: return@launch
             gateway.setSessionModel(sessionKey = sessionKey, model = model)
                 .onFailure { Log.e(TAG, "切换模型失败: ${it.message}") }
+        }
+    }
+
+    private fun persistConversations() {
+        viewModelScope.launch(Dispatchers.IO) {
+            conversationStore.save(_conversations.value)
         }
     }
 
