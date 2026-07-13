@@ -37,6 +37,8 @@ import java.net.URI
 object SsoNavigationPolicy {
     private val allowedHosts = setOf(
         "account.xiaomi.com",
+        "login.xiaomi.com",
+        "passport.xiaomi.com",
         "aistudio.xiaomimimo.com",
         "mi.com",
         "www.mi.com"

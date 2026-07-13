@@ -8,6 +8,8 @@ class SsoSecurityTest {
     @Test
     fun `navigation requires https and exact host`() {
         assertTrue(SsoNavigationPolicy.isAllowed("https://account.xiaomi.com/fe/service/login"))
+        assertTrue(SsoNavigationPolicy.isAllowed("https://login.xiaomi.com/pass/serviceLogin"))
+        assertTrue(SsoNavigationPolicy.isAllowed("https://passport.xiaomi.com/oauth2/authorize"))
         assertTrue(SsoNavigationPolicy.isAllowed("https://aistudio.xiaomimimo.com/sts"))
         assertFalse(SsoNavigationPolicy.isAllowed("http://account.xiaomi.com/fe/service/login"))
         assertFalse(SsoNavigationPolicy.isAllowed("https://account.xiaomi.com.evil.example/login"))
