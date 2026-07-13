@@ -73,6 +73,12 @@ class TokenManager @Inject constructor(
         this.username = username
     }
 
+    /** 仅保存用户信息用于展示，不涉及 token/expires */
+    fun saveUserInfo(userId: String?, username: String?) {
+        this.userId = userId
+        this.username = username
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

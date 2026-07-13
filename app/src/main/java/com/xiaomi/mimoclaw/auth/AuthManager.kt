@@ -27,10 +27,9 @@ class AuthManager @Inject constructor(
             }
 
             val info = response.body()?.data ?: error("用户信息为空")
-            tokenManager.saveAuth(
-                accessToken = "sso_cookie",
-                refreshToken = null,
-                expiresAt = System.currentTimeMillis() + AUTH_CACHE_DURATION_MS,
+            // 仅保存用户信息用于展示，不写入假 token
+            // 登录态由 CookieManager 中的 SSO Cookie 决定
+            tokenManager.saveUserInfo(
                 userId = info.userId,
                 username = info.nickname ?: info.userId
             )
