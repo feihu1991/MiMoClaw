@@ -46,7 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.xiaomi.mimoclaw.feature.chat.model.ChatMessage
+import com.xiaomi.mimoclaw.feature.chat.model.DisplayItem
 
 /** Native MiMo Chat surface. It deliberately does not embed the web console. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,7 +58,7 @@ fun NativeChatScreen(
     onProfile: () -> Unit
 ) {
     val conversations by viewModel.conversations.collectAsState()
-    val current by viewModel.currentConversation.collectAsState()
+    val displayItems by viewModel.displayItems.collectAsState()
     var input by remember { mutableStateOf("") }
     var historyOpen by remember { mutableStateOf(false) }
 
@@ -101,8 +101,7 @@ fun NativeChatScreen(
             }
         }
     ) { padding ->
-        val messages = current?.messages.orEmpty()
-        if (messages.isEmpty()) {
+        if (displayItems.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("MiMo Chat", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -114,7 +113,7 @@ fun NativeChatScreen(
                 modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(messages, key = { it.id }) { message -> NativeMessage(message) }
+                items(displayItems, key = { it.id }) { item -> NativeDisplayItem(item) }
             }
         }
     }
@@ -135,12 +134,52 @@ fun NativeChatScreen(
 }
 
 @Composable
-private fun NativeMessage(message: ChatMessage) {
-    val user = message.role == ChatMessage.Role.USER
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
-        Surface(
-            color = if (user) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(18.dp)
-        ) { Text(message.content.ifBlank { "正在回复…" }, Modifier.padding(14.dp), color = if (user) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) }
+private fun NativeDisplayItem(item: DisplayItem) {
+    when (item) {
+        is DisplayItem.UserMessage -> {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(18.dp)
+                ) { Text(item.message.content, Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onPrimaryContainer) }
+            }
+        }
+        is DisplayItem.AssistantMessage -> {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(18.dp)
+                ) { Text(item.message.content.ifBlank { "正在回复…" }, Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+        is DisplayItem.ToolGroup -> {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    item.tools.forEach { tool ->
+                        Text(
+                            "${if (tool.status == "已完成") "✅" else "⏳"} ${tool.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+        is DisplayItem.ThinkingBlock -> {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "💭 ${item.text.take(200)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
     }
 }
