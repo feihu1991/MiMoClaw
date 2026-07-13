@@ -10,13 +10,14 @@ android {
     namespace = "com.xiaomi.mimoclaw"
     compileSdk = 35
 
+    // CI 构建时通过环境变量注入，本地开发默认 1
+    // versionCode 与语义版本 tag 对齐: v3.0.{N} → 30000 + N
+    val runNumber = (System.getenv("BUILD_NUMBER") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull()
+
     defaultConfig {
         applicationId = "com.xiaomi.mimoclaw"
         minSdk = 26
         targetSdk = 35
-        // CI 构建时通过环境变量注入，本地开发默认 1
-        // versionCode 与语义版本 tag 对齐: v3.0.{N} → 30000 + N
-        val runNumber = (System.getenv("BUILD_NUMBER") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull()
         versionCode = runNumber?.let { 30000 + it } ?: 1
         versionName = System.getenv("VERSION_NAME") ?: "3.0.0-dev"
     }
