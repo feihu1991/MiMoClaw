@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.xiaomi.mimoclaw.core.update.UpdateDialog
 import com.xiaomi.mimoclaw.core.update.UpdateState
 import com.xiaomi.mimoclaw.core.update.UpdateViewModel
 import com.xiaomi.mimoclaw.BuildConfig
@@ -111,7 +112,7 @@ fun SettingsScreen(
 
     // ── 更新弹窗 (手动检查时) ──
     val updateInfo by updateViewModel.updateInfo.collectAsState()
-    com.xiaomi.mimoclaw.core.update.UpdateDialog(
+    UpdateDialog(
         updateState = updateState,
         updateInfo = updateInfo,
         onUpdate = { updateViewModel.startDownload() },
