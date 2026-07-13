@@ -31,9 +31,8 @@ class ClawGateway @Inject constructor(
 ) {
     companion object {
         private const val TAG = "ClawGateway"
-        private const val WS_BASE = "wss://aistudio.xiaomimimo.com/ws/proxy"
-        private const val REST_BASE = "https://aistudio.xiaomimimo.com"
-
+        private val WS_BASE get() = BuildConfig.WS_BASE_URL
+        private val REST_BASE get() = BuildConfig.API_BASE_URL
     }
 
     // ── 连接状态 ──
@@ -181,7 +180,7 @@ class ClawGateway @Inject constructor(
 
         val request = Request.Builder()
             .url(wsUrl)
-            .header("Origin", "https://aistudio.xiaomimimo.com")
+            .header("Origin", REST_BASE)
             .header("Cookie", cookies)
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) Chrome/137.0.0.0 Mobile Safari/537.36")
             .build()

@@ -2,6 +2,7 @@ package com.xiaomi.mimoclaw.auth
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import com.xiaomi.mimoclaw.BuildConfig
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
@@ -162,7 +163,7 @@ class AuthWebViewActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
-        const val STUDIO_ORIGIN = "https://aistudio.xiaomimimo.com"
+        val STUDIO_ORIGIN: String get() = BuildConfig.API_BASE_URL
         const val LOGIN_URL = "$STUDIO_ORIGIN/open-apis/v1/genLoginUrl"
         const val COOKIE_CHECK_INTERVAL_MS = 1_500L
         const val RESULT_LOGIN_ERROR = Activity.RESULT_FIRST_USER

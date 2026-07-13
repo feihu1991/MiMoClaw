@@ -1,5 +1,6 @@
 package com.xiaomi.mimoclaw.auth
 
+import com.xiaomi.mimoclaw.BuildConfig
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -58,7 +59,7 @@ interface AuthRepository {
     suspend fun getWsTicket(): Response<WsTicketResponse>
 
     companion object {
-        const val BASE_URL = "https://aistudio.xiaomimimo.com/"
+        val BASE_URL: String get() = BuildConfig.API_BASE_URL + "/"
     }
 }
 

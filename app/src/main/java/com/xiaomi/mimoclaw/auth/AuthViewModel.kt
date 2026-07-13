@@ -3,6 +3,7 @@ package com.xiaomi.mimoclaw.auth
 import android.webkit.CookieManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xiaomi.mimoclaw.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -33,7 +34,7 @@ class AuthViewModel @Inject constructor(
 
             // CookieManager 操作必须在主线程
             val cookies = withContext(Dispatchers.Main) {
-                CookieManager.getInstance().getCookie("https://aistudio.xiaomimimo.com")
+                CookieManager.getInstance().getCookie(BuildConfig.API_BASE_URL)
             }
             if (cookies?.contains("serviceToken") == true && cookies.contains("xiaomichatbot_ph")) {
                 val valid = authManager.validateLogin()
@@ -64,7 +65,7 @@ class AuthViewModel @Inject constructor(
                 },
                 onFailure = {
                     val cookies = withContext(Dispatchers.Main) {
-                        CookieManager.getInstance().getCookie("https://aistudio.xiaomimimo.com")
+                        CookieManager.getInstance().getCookie(BuildConfig.API_BASE_URL)
                     }
                     _loginState.value = LoginState.Error(it.message ?: "登录验证失败")
                     _isLoggedIn.value = false

@@ -27,6 +27,9 @@ android {
         targetSdk = 35
         versionCode = 4
         versionName = "4.0.0-test"
+
+        buildConfigField("String", "API_BASE_URL", "\"https://aistudio.xiaomimimo.com\"")
+        buildConfigField("String", "WS_BASE_URL", "\"wss://aistudio.xiaomimimo.com/ws/proxy\"")
     }
 
     signingConfigs {
