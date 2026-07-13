@@ -283,7 +283,10 @@ class ChatViewModel @Inject constructor(
         val existing = _conversations.value.associateBy { it.sessionKey }
         val serverKeys = sessions.mapTo(mutableSetOf()) { it.key }
         val localOnly = _conversations.value.filter { it.sessionKey !in serverKeys && it.messages.isNotEmpty() }
-        val serverConversations = sessions.map { session ->
+        // 按 sessionKey 去重，优先保留本地已有数据（可能含消息）
+        val seen = mutableSetOf<String>()
+        val serverConversations = sessions.mapNotNull { session ->
+            if (!seen.add(session.key)) return@mapNotNull null
             existing[session.key] ?: Conversation(
                 id = session.sessionId.ifEmpty { session.key },
                 title = session.title,
