@@ -550,7 +550,8 @@ class ClawGateway @Inject constructor(
         }
 
         debug { "发送 chat.send: session=$sessionKey model=$model" }
-        val result = sendRpc(requestId, "chat.send", params)
+        // chat.send 只负责发送确认，10s 足够；流式响应由 WebSocket 推送
+        val result = sendRpc(requestId, "chat.send", params, timeoutMs = 10_000)
         result.map { }
     }
 
@@ -654,7 +655,8 @@ class ClawGateway @Inject constructor(
     private suspend fun sendRpc(
         id: String,
         method: String,
-        params: JSONObject
+        params: JSONObject,
+        timeoutMs: Long = 30_000
     ): Result<JSONObject?> {
         val deferred = CompletableDeferred<JSONObject?>()
         pendingRequests[id] = deferred
@@ -675,7 +677,7 @@ class ClawGateway @Inject constructor(
         }
 
         return try {
-            withTimeout(120_000) {
+            withTimeout(timeoutMs) {
                 val payload = deferred.await()
                 Result.success(payload)
             }
