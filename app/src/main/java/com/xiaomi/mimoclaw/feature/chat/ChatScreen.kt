@@ -274,8 +274,15 @@ private fun ConversationContent(
     val scope = rememberCoroutineScope()
 
     // 自动滚动到底部（reverseLayout=true 时 index 0 是最新消息）
-    val lastItemLength = displayItems.lastOrNull()?.id?.length ?: 0
-    LaunchedEffect(displayItems.size, lastItemLength) {
+    // 用最后一条内容的长度作为 key，流式更新时也能触发滚动
+    val lastContentLength = when (val last = displayItems.lastOrNull()) {
+        is DisplayItem.AssistantMessage -> last.message.content.length
+        is DisplayItem.UserMessage -> last.message.content.length
+        is DisplayItem.ToolGroup -> last.tools.size
+        is DisplayItem.ThinkingBlock -> last.text.length
+        else -> 0
+    }
+    LaunchedEffect(displayItems.size, lastContentLength) {
         if (displayItems.isNotEmpty()) {
             listState.scrollToItem(0)
         }
