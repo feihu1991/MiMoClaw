@@ -99,13 +99,18 @@ object VersionPolicy {
         is ParsedVersion.Build -> remote.code > currentVersionCode
         is ParsedVersion.Semantic -> {
             val current = parse(currentVersionName) as? ParsedVersion.Semantic
-            current == null || compareValuesBy(
-                remote,
-                current,
-                ParsedVersion.Semantic::major,
-                ParsedVersion.Semantic::minor,
-                ParsedVersion.Semantic::patch
-            ) > 0
+            if (current != null) {
+                compareValuesBy(
+                    remote,
+                    current,
+                    ParsedVersion.Semantic::major,
+                    ParsedVersion.Semantic::minor,
+                    ParsedVersion.Semantic::patch
+                ) > 0
+            } else {
+                // 无法解析当前版本名，降级用 build code 比较
+                remote.code > currentVersionCode
+            }
         }
     }
 

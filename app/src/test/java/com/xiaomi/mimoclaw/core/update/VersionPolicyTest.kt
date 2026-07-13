@@ -25,4 +25,13 @@ class VersionPolicyTest {
         assertFalse(VersionPolicy.parse("release-latest") != null)
         assertFalse(VersionPolicy.parse("v4.0") != null)
     }
+
+    @Test
+    fun `unparseable current version falls back to build code`() {
+        val remote = requireNotNull(VersionPolicy.parse("v4.0.1"))
+        // currentVersionCode=3 < remote.code=40001 → should update
+        assertTrue(VersionPolicy.shouldUpdate(remote, 3, "unparseable"))
+        // currentVersionCode=99999 > remote.code=40001 → should NOT update
+        assertFalse(VersionPolicy.shouldUpdate(remote, 99999, "unparseable"))
+    }
 }
