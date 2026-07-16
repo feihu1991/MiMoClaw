@@ -5,9 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -40,21 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiaomi.mimoclaw.feature.chat.model.ChatMessage
 
-/**
- * 用户消息气泡（右对齐）
- *
- * 参考 happy 的 UserTextBlock 设计：
- * - 右对齐，圆角气泡
- * - 紧凑的 padding
- * - 文本可选择
- */
+/** User messages stay compact and right-aligned, matching Happy's session feed. */
 @Composable
 fun UserBubble(message: ChatMessage) {
     Row(
@@ -62,17 +50,22 @@ fun UserBubble(message: ChatMessage) {
         horizontalArrangement = Arrangement.End
     ) {
         Surface(
-            modifier = Modifier.widthIn(max = 300.dp),
-            shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            modifier = Modifier.widthIn(max = 520.dp),
+            shape = RoundedCornerShape(
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomEnd = 6.dp,
+                bottomStart = 20.dp
+            ),
+            color = MaterialTheme.colorScheme.primaryContainer
         ) {
             SelectionContainer {
                 Text(
                     text = message.content,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 11.dp),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 22.sp
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    lineHeight = 23.sp
                 )
             }
         }
@@ -80,111 +73,90 @@ fun UserBubble(message: ChatMessage) {
 }
 
 /**
- * 助手消息气泡（左对齐，带头像）
- *
- * 参考 happy 的 AgentTextBlock 设计：
- * - 左对齐，无气泡背景
- * - 紧凑的头像
- * - 思考过程可折叠
- * - 复制按钮在底部
+ * Agent replies use an identity row and an open content layout rather than a large chat bubble.
+ * This leaves room for reasoning, tool calls and code-oriented content in the same vertical feed.
  */
 @Composable
 fun AssistantBubble(message: ChatMessage) {
     var showThinking by remember(message.id) { mutableStateOf(false) }
     val context = LocalContext.current
 
-    Column(
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
     ) {
-        // 思考过程（可折叠）
-        if (message.thinkingContent.isNotBlank()) {
-            ThinkingPanel(
-                text = message.thinkingContent,
-                expanded = showThinking,
-                onToggle = { showThinking = !showThinking }
-            )
-        }
-
-        // 流式加载指示
-        if (message.isStreaming && message.content.isEmpty()) {
-            ThinkingIndicator()
-        } else {
-            // 正文（无气泡背景，直接显示）
-            SelectionContainer {
+        Surface(
+            modifier = Modifier.size(30.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface
+        ) {
+            Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    lineHeight = 26.sp
+                    text = "M",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
+        Spacer(Modifier.width(10.dp))
 
-        // 复制按钮（完成后显示）
-        if (message.content.isNotBlank() && !message.isStreaming) {
-            Spacer(Modifier.height(6.dp))
-            IconButton(
-                onClick = { copyMessage(context, message.content) },
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = "复制回复",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 思考过程折叠面板
- *
- * 参考 happy 的 ThinkingPanel 设计：
- * - 更紧凑的布局
- * - 更明显的折叠状态
- */
-@Composable
-private fun ThinkingPanel(text: String, expanded: Boolean, onToggle: () -> Unit) {
-    Surface(
-        onClick = onToggle,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .widthIn(max = 760.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.AutoAwesome,
-                    null,
-                    Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-                Spacer(Modifier.width(6.dp))
                 Text(
-                    "思考过程",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    text = "MiMo Claw",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    null,
-                    Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                if (message.isStreaming) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "执行中",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(Modifier.height(7.dp))
+
+            if (message.thinkingContent.isNotBlank()) {
+                ThinkingPanel(
+                    text = message.thinkingContent,
+                    expanded = showThinking,
+                    onToggle = { showThinking = !showThinking }
                 )
             }
-            AnimatedVisibility(expanded) {
+
+            if (message.isStreaming && message.content.isEmpty()) {
+                ThinkingIndicator()
+            } else {
                 SelectionContainer {
                     Text(
-                        text,
-                        modifier = Modifier.padding(top = 6.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        lineHeight = 26.sp
+                    )
+                }
+            }
+
+            if (message.content.isNotBlank() && !message.isStreaming) {
+                Spacer(Modifier.height(5.dp))
+                IconButton(
+                    onClick = { copyMessage(context, message.content) },
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "复制回复",
+                        modifier = Modifier.size(15.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
                     )
                 }
             }
@@ -192,29 +164,74 @@ private fun ThinkingPanel(text: String, expanded: Boolean, onToggle: () -> Unit)
     }
 }
 
-/**
- * 流式加载指示器
- *
- * 参考 happy 的 ThinkingIndicator 设计：
- * - 更紧凑的布局
- * - 更小的加载动画
- */
+@Composable
+private fun ThinkingPanel(
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        onClick = onToggle,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 10.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f)
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = if (expanded) "收起思考过程" else "查看思考过程",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AnimatedVisibility(expanded) {
+                SelectionContainer {
+                    Text(
+                        text = text,
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 19.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ThinkingIndicator() {
     Row(
-        modifier = Modifier.height(24.dp),
+        modifier = Modifier.height(26.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(14.dp),
             strokeWidth = 1.5.dp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            "正在思考",
+            text = "正在分析任务",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
