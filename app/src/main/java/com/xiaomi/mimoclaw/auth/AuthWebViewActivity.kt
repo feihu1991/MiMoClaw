@@ -164,7 +164,7 @@ class AuthWebViewActivity : Activity() {
 
     companion object {
         val STUDIO_ORIGIN: String get() = BuildConfig.API_BASE_URL
-        const val LOGIN_URL = "$STUDIO_ORIGIN/open-apis/v1/genLoginUrl"
+        val LOGIN_URL: String get() = "$STUDIO_ORIGIN/open-apis/v1/genLoginUrl"
         const val COOKIE_CHECK_INTERVAL_MS = 1_500L
         const val RESULT_LOGIN_ERROR = Activity.RESULT_FIRST_USER
         const val EXTRA_ERROR = "login_error"
