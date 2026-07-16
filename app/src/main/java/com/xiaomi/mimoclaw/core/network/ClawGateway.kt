@@ -56,11 +56,12 @@ class ClawGateway @Inject constructor(
     private val wsClient = okHttpClient.newBuilder()
         .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
         .build()
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() +
-        CoroutineExceptionHandler { _, throwable ->
-            Log.e(TAG, "Coroutine 未捕获异常", throwable)
-            scope.launch { _events.emit(GatewayEvent.Error(throwable.message ?: "未知错误")) }
-        })
+    private val scope: CoroutineScope = CoroutineScope(
+    Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "Coroutine 未捕获异常", throwable)
+        _events.tryEmit(GatewayEvent.Error(throwable.message ?: "未知错误"))
+    }
+)
 
     private fun debug(message: () -> String) {
         if (BuildConfig.DEBUG) Log.d(TAG, message())
