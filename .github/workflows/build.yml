@@ -64,6 +64,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Build Release APK
+        if: github.event_name == 'push'
         run: ./gradlew assembleRelease
 
       - name: Upload Debug APK
@@ -73,6 +74,7 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Release APK
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: mimo-claw-release
