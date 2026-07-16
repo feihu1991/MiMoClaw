@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -180,7 +181,7 @@ fun LoginScreen(
                             imageVector = Icons.Rounded.Login,
                             contentDescription = null
                         )
-                        Spacer(Modifier.height(0.dp).weight(0.08f))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             text = if (isLoading) "正在验证…" else "使用小米账号登录",
                             fontWeight = FontWeight.SemiBold
