@@ -33,19 +33,17 @@ jobs:
               CoroutineExceptionHandler { _, throwable ->
                   Log.e(TAG, "Coroutine 未捕获异常", throwable)
                   scope.launch { _events.emit(GatewayEvent.Error(throwable.message ?: "未知错误")) }
-              })'''
+              })'''.replace("              ", "        ").replace("                  ", "            ")
           new = '''    private val scope: CoroutineScope = CoroutineScope(
               Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
                   Log.e(TAG, "Coroutine 未捕获异常", throwable)
                   _events.tryEmit(GatewayEvent.Error(throwable.message ?: "未知错误"))
               }
-          )'''
-          if old in source:
-              path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          )'''.replace("              ", "        ").replace("                  ", "            ")
+          if old not in source:
+              raise SystemExit("Expected ClawGateway scope block was not found")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
           PY
-          if git diff --quiet -- app/src/main/java/com/xiaomi/mimoclaw/core/network/ClawGateway.kt; then
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/xiaomi/mimoclaw/core/network/ClawGateway.kt
