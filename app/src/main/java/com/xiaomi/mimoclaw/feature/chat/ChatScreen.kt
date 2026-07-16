@@ -1,8 +1,8 @@
 package com.xiaomi.mimoclaw.feature.chat
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,13 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -32,12 +32,14 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -45,19 +47,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -78,7 +76,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiaomi.mimoclaw.core.network.ConnectionState
-import com.xiaomi.mimoclaw.feature.chat.model.ChatMessage
 import com.xiaomi.mimoclaw.feature.chat.model.Conversation
 import com.xiaomi.mimoclaw.feature.chat.model.DisplayItem
 import kotlinx.coroutines.launch
@@ -135,8 +132,10 @@ fun ChatScreen(
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                ConversationTopBar(
-                    onHistoryClick = { scope.launch { drawerState.open() } },
+                SessionTopBar(
+                    conversationTitle = currentConversation?.title ?: "新对话",
+                    connectionState = connectionState,
+                    onMenuClick = { scope.launch { drawerState.open() } },
                     onNewClick = {
                         viewModel.newConversation()
                         inputText = ""
@@ -144,7 +143,15 @@ fun ChatScreen(
                 )
             },
             bottomBar = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    AgentSessionStatus(
+                        connectionState = connectionState,
+                        isStreaming = isStreaming
+                    )
                     ChatInputBar(
                         inputText = inputText,
                         onInputChange = { inputText = it },
@@ -156,12 +163,7 @@ fun ChatScreen(
                         },
                         onStop = viewModel::abortChat,
                         isStreaming = isStreaming,
-                        model = "MiMo Claw"
-                    )
-                    ClawBottomNavigation(
-                        onChat = onNavigateToBrowser,
-                        onFiles = onNavigateToFiles,
-                        onProfile = onNavigateToSettings
+                        model = currentConversation?.model ?: "mimo-v2.5-pro"
                     )
                 }
             }
@@ -184,60 +186,101 @@ fun ChatScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ConversationTopBar(
-    onHistoryClick: () -> Unit,
+private fun SessionTopBar(
+    conversationTitle: String,
+    connectionState: ConnectionState,
+    onMenuClick: () -> Unit,
     onNewClick: () -> Unit
 ) {
     TopAppBar(
         windowInsets = WindowInsets.statusBars,
         navigationIcon = {
-            TextButton(onClick = onHistoryClick) { Text("记录") }
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, contentDescription = "打开会话列表")
+            }
         },
         title = {
-            Text("MiMo Claw", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "MiMo Claw",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "  /  ",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = conversationTitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDot(connectionState)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = connectionText(connectionState),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         },
         actions = {
-            TextButton(onClick = onNewClick) { Text("新对话", fontWeight = FontWeight.SemiBold) }
-            Spacer(Modifier.width(4.dp))
+            IconButton(onClick = onNewClick) {
+                Icon(Icons.Default.Add, contentDescription = "新建对话")
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.background
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrolledContainerColor = MaterialTheme.colorScheme.surface
         )
     )
 }
 
 @Composable
-private fun ClawBottomNavigation(
-    onChat: () -> Unit,
-    onFiles: () -> Unit,
-    onProfile: () -> Unit
+private fun AgentSessionStatus(
+    connectionState: ConnectionState,
+    isStreaming: Boolean
 ) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-        NavigationBarItem(
-            selected = true,
-            onClick = {},
-            icon = { Icon(Icons.Default.Code, null) },
-            label = { Text("Claw") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onChat,
-            icon = { Icon(Icons.Default.Public, null) },
-            label = { Text("Chat") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onFiles,
-            icon = { Icon(Icons.Default.FolderOpen, null) },
-            label = { Text("文件") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onProfile,
-            icon = { Icon(Icons.Default.Settings, null) },
-            label = { Text("我的") }
-        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .widthIn(max = 760.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatusDot(connectionState)
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = if (isStreaming) "Agent 正在执行" else connectionText(connectionState),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(10.dp))
+            Surface(
+                shape = RoundedCornerShape(100.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            ) {
+                Text(
+                    text = "本地工作区",
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
@@ -248,22 +291,25 @@ private fun StatusDot(state: ConnectionState) {
         ConnectionState.CONNECTING -> Color(0xFFD59A31)
         ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.error
     }
-    val alpha by animateFloatAsState(
+    val dotAlpha by animateFloatAsState(
         targetValue = if (state == ConnectionState.CONNECTING) 0.45f else 1f,
         label = "connection_dot"
     )
     Box(
         Modifier
             .size(8.dp)
-            .alpha(alpha)
+            .alpha(dotAlpha)
             .clip(CircleShape)
             .background(color)
     )
 }
 
-/**
- * 对话内容区域（使用 displayItems + reverseLayout）
- */
+private fun connectionText(state: ConnectionState): String = when (state) {
+    ConnectionState.CONNECTED -> "Agent 已连接"
+    ConnectionState.CONNECTING -> "正在连接 Agent"
+    ConnectionState.DISCONNECTED -> "Agent 未连接"
+}
+
 @Composable
 private fun ConversationContent(
     displayItems: List<DisplayItem>,
@@ -272,23 +318,18 @@ private fun ConversationContent(
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-
-    // 自动滚动到底部（reverseLayout=true 时 index 0 是最新消息）
-    // 用最后一条内容的长度作为 key，流式更新时也能触发滚动
     val lastContentLength = when (val last = displayItems.lastOrNull()) {
         is DisplayItem.AssistantMessage -> last.message.content.length
         is DisplayItem.UserMessage -> last.message.content.length
         is DisplayItem.ToolGroup -> last.tools.size
         is DisplayItem.ThinkingBlock -> last.text.length
-        else -> 0
-    }
-    LaunchedEffect(displayItems.size, lastContentLength) {
-        if (displayItems.isNotEmpty()) {
-            listState.scrollToItem(0)
-        }
+        null -> 0
     }
 
-    // 滚动按钮显示条件
+    LaunchedEffect(displayItems.size, lastContentLength) {
+        if (displayItems.isNotEmpty()) listState.scrollToItem(0)
+    }
+
     val showScrollButton by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 2 ||
@@ -297,44 +338,35 @@ private fun ConversationContent(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 消息列表（reverseLayout=true 实现 inverted 效果）
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             reverseLayout = true,
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(
-                items = displayItems,
-                key = { it.id }
-            ) { item ->
+            items(items = displayItems, key = { it.id }) { item ->
                 DisplayItemRow(item, viewModel)
             }
         }
 
-        // 滚动按钮
         if (showScrollButton) {
             Surface(
                 onClick = { scope.launch { listState.scrollToItem(0) } },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 16.dp)
-                    .size(36.dp),
+                    .size(38.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 4.dp,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant
-                )
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.ArrowDownward,
                         contentDescription = "回到底部",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -342,9 +374,6 @@ private fun ConversationContent(
     }
 }
 
-/**
- * 显示项渲染分发
- */
 @Composable
 private fun DisplayItemRow(item: DisplayItem, viewModel: ChatViewModel) {
     when (item) {
@@ -356,10 +385,7 @@ private fun DisplayItemRow(item: DisplayItem, viewModel: ChatViewModel) {
             isCollapsed = viewModel.isGroupCollapsed(item.id),
             onToggle = { viewModel.toggleGroup(item.id) }
         )
-        is DisplayItem.ThinkingBlock -> {
-            // 思考块已经在 AssistantBubble 中处理，这里跳过
-            // 如果需要独立显示，可以添加 ThinkingBlockCard
-        }
+        is DisplayItem.ThinkingBlock -> Unit
     }
 }
 
@@ -370,9 +396,9 @@ private fun EmptyConversation(
 ) {
     val suggestions = remember {
         listOf(
-            Suggestion(Icons.Default.Code, "分析代码", "帮我分析这段代码并指出潜在问题"),
-            Suggestion(Icons.Default.Description, "整理内容", "帮我把这份内容整理成清晰的要点"),
-            Suggestion(Icons.Default.AutoAwesome, "开始创作", "帮我从零开始构思一个可执行方案")
+            Suggestion(Icons.Default.Code, "修改项目代码", "读取当前项目，帮我修改代码并展示改动"),
+            Suggestion(Icons.Default.Description, "检查本次改动", "检查当前修改，指出风险并给出改进建议"),
+            Suggestion(Icons.Default.AutoAwesome, "提交到 Git", "整理本次修改，生成提交信息并准备提交到 Git")
         )
     }
 
@@ -380,40 +406,42 @@ private fun EmptyConversation(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 22.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(
-            modifier = Modifier.size(46.dp),
-            shape = RoundedCornerShape(15.dp),
-            color = MaterialTheme.colorScheme.inverseSurface
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    "M",
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+        Column(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.inverseSurface
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "M",
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
             }
-        }
-        Spacer(Modifier.height(24.dp))
-        Text(
-            "今天想一起做什么？",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "提问、写作、分析代码，或把一个模糊想法变成行动。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            lineHeight = 21.sp
-        )
-        Spacer(Modifier.height(30.dp))
-        suggestions.forEach { suggestion ->
-            SuggestionRow(suggestion) { onSuggestionSelected(suggestion.prompt) }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(22.dp))
+            Text(
+                "今天想改什么？",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "读取文件、修改代码、查看差异并提交 Git。构建、打包和部署不在本地 Agent 范围内。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 21.sp
+            )
+            Spacer(Modifier.height(28.dp))
+            suggestions.forEach { suggestion ->
+                SuggestionRow(suggestion) { onSuggestionSelected(suggestion.prompt) }
+                Spacer(Modifier.height(10.dp))
+            }
         }
     }
 }
@@ -431,10 +459,7 @@ private fun SuggestionRow(suggestion: Suggestion, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
-        )
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
@@ -481,12 +506,14 @@ private fun ConversationDrawer(
         drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 14.dp, top = 20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 18.dp, end = 14.dp, top = 20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    modifier = Modifier.size(34.dp),
-                    shape = RoundedCornerShape(11.dp),
+                    modifier = Modifier.size(36.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.inverseSurface
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -505,15 +532,15 @@ private fun ConversationDrawer(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        when (connectionState) {
-                            ConnectionState.CONNECTED -> "云端 Agent 已连接"
-                            ConnectionState.CONNECTING -> "正在连接云端 Agent"
-                            ConnectionState.DISCONNECTED -> "云端 Agent 未连接"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(connectionState)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            connectionText(connectionState),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -521,10 +548,7 @@ private fun ConversationDrawer(
                 onClick = onNewConversation,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(13.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant
-                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 )
@@ -536,7 +560,7 @@ private fun ConversationDrawer(
         }
 
         Text(
-            "最近",
+            "最近会话",
             modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -545,7 +569,9 @@ private fun ConversationDrawer(
         if (conversations.isEmpty()) {
             Text(
                 "还没有对话",
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -566,8 +592,30 @@ private fun ConversationDrawer(
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            DrawerDestination(Icons.Default.Public, "MiMo Chat", onBrowser)
+            DrawerDestination(Icons.Default.FolderOpen, "文件工作区", onFiles)
+            DrawerDestination(Icons.Default.Settings, "设置", onSettings)
+        }
     }
+}
+
+@Composable
+private fun DrawerDestination(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    NavigationDrawerItem(
+        label = { Text(label) },
+        selected = false,
+        onClick = onClick,
+        icon = { Icon(icon, contentDescription = null) },
+        shape = RoundedCornerShape(12.dp),
+        colors = NavigationDrawerItemDefaults.colors(
+            unselectedContainerColor = Color.Transparent
+        )
+    )
 }
 
 @Composable
