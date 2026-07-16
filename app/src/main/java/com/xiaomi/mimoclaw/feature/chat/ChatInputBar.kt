@@ -1,7 +1,7 @@
 package com.xiaomi.mimoclaw.feature.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -20,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Square
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,17 +33,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * 底部输入栏组件
+ * Happy 风格的统一 Agent 输入面板。
  *
- * 从 ChatScreen 抽取的独立组件，包含：
- * - 圆角输入框（最多 5 行）
- * - 底部行：模型标签 + 发送/停止按钮
- * - 状态提示
+ * 文本输入、工作区状态、模型信息和发送/停止操作都收敛在同一个圆角面板中，
+ * 避免聊天页底部出现多个相互割裂的工具栏。
  */
 @Composable
 fun ChatInputBar(
@@ -58,33 +59,32 @@ fun ChatInputBar(
             .background(MaterialTheme.colorScheme.background)
             .imePadding()
             .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 760.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant
-            ),
-            shadowElevation = 5.dp
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 4.dp
         ) {
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                // 输入框
                 TextField(
                     value = inputText,
                     onValueChange = onInputChange,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
-                            "给 MiMo Claw 发消息",
+                            "向 MiMo Claw 描述要完成的任务",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 23.sp),
-                    maxLines = 5,
+                    minLines = 1,
+                    maxLines = 6,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = { if (inputText.isNotBlank() && !isStreaming) onSend() }
@@ -98,56 +98,76 @@ fun ChatInputBar(
                     )
                 )
 
-                // 底部行：模型标签 + 发送/停止按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 8.dp, end = 2.dp),
+                        .padding(start = 6.dp, end = 2.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 模型图标
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                "本地",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
                     Icon(
                         Icons.Default.AutoAwesome,
                         contentDescription = null,
                         modifier = Modifier.size(15.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.width(6.dp))
-
-                    // 模型名称
+                    Spacer(Modifier.width(5.dp))
                     Text(
                         prettyModelName(model),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
 
                     Spacer(Modifier.weight(1f))
 
-                    // 发送/停止按钮
                     Surface(
                         onClick = if (isStreaming) onStop else onSend,
                         enabled = isStreaming || inputText.isNotBlank(),
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(36.dp),
                         shape = CircleShape,
-                        color = if (isStreaming) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else if (inputText.isNotBlank()) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
+                        color = when {
+                            isStreaming -> MaterialTheme.colorScheme.onSurface
+                            inputText.isNotBlank() -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.surfaceVariant
                         }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = if (isStreaming) Icons.Default.Square else Icons.AutoMirrored.Filled.Send,
-                                contentDescription = if (isStreaming) "停止生成" else "发送",
-                                modifier = Modifier.size(if (isStreaming) 15.dp else 18.dp),
-                                tint = if (isStreaming) {
-                                    MaterialTheme.colorScheme.surface
-                                } else if (inputText.isNotBlank()) {
-                                    MaterialTheme.colorScheme.onPrimary
+                                imageVector = if (isStreaming) {
+                                    Icons.Default.Square
                                 } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                    Icons.AutoMirrored.Filled.Send
+                                },
+                                contentDescription = if (isStreaming) "停止生成" else "发送",
+                                modifier = Modifier.size(if (isStreaming) 14.dp else 17.dp),
+                                tint = when {
+                                    isStreaming -> MaterialTheme.colorScheme.surface
+                                    inputText.isNotBlank() -> MaterialTheme.colorScheme.onPrimary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 }
                             )
                         }
@@ -156,17 +176,17 @@ fun ChatInputBar(
             }
         }
 
-        // 状态提示
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
-            "AI 可能会出错，请核对重要信息",
+            "文件修改和 Git 操作执行前会展示变更并请求确认",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f)
         )
     }
 }
 
 private fun prettyModelName(model: String): String = when (model.lowercase()) {
     "mimo-v2.5-pro" -> "MiMo V2.5 Pro"
+    "mimo-v2.5" -> "MiMo V2.5"
     else -> model
 }
