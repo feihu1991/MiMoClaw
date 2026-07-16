@@ -39,7 +39,21 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        shell: bash
+        run: |
+          set +e
+          ./gradlew assembleDebug --console=plain > gradle-debug.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Relevant Gradle errors"
+            grep -E -C 3 '(^e: |error:|Unresolved reference|Compilation error|Execution failed for task|FAILURE:|What went wrong:)' gradle-debug.log || true
+            echo "::endgroup::"
+            echo "::group::Gradle log tail"
+            tail -n 100 gradle-debug.log
+            echo "::endgroup::"
+            exit "$status"
+          fi
+          tail -n 30 gradle-debug.log
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
