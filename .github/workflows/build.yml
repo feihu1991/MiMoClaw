@@ -55,6 +55,14 @@ jobs:
           fi
           tail -n 30 gradle-debug.log
 
+      - name: Upload Gradle failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-debug-failure
+          path: gradle-debug.log
+          if-no-files-found: ignore
+
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
